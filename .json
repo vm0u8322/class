@@ -1,0 +1,205 @@
+{
+  "schoolYear": "114",
+  "semester": "第二學期",
+  "classSchedule": {
+    "Monday": [
+      {
+        "period": "第三節",
+        "time": "10:10-11:00",
+        "course": "英文",
+        "teacher": "鄭淑麗",
+        "location": "視聽教室(國際樓)"
+      },
+      {
+        "period": "第四節",
+        "time": "11:10-12:00",
+        "course": "英文",
+        "teacher": "鄭淑麗",
+        "location": "視聽教室(國際樓)"
+      },
+      {
+        "period": "第五節",
+        "time": "13:30-14:20",
+        "course": "資料庫管理系統實作",
+        "teacher": "李文毅",
+        "location": "電703(承曦樓)"
+      },
+      {
+        "period": "第六節",
+        "time": "14:25-15:15",
+        "course": "資料庫管理系統實作",
+        "teacher": "李文毅",
+        "location": "電703(承曦樓)"
+      },
+      {
+        "period": "第七節",
+        "time": "15:25-16:15",
+        "course": "資料庫管理系統實作",
+        "teacher": "李文毅",
+        "location": "電703(承曦樓)"
+      }
+    ],
+    "Tuesday": [
+      {
+        "period": "第二節",
+        "time": "09:10-10:00",
+        "course": "應用統計學",
+        "teacher": "陳春燕",
+        "location": "電707(承曦樓)"
+      },
+      {
+        "period": "第三節",
+        "time": "10:10-11:00",
+        "course": "應用統計學",
+        "teacher": "陳春燕",
+        "location": "電707(承曦樓)"
+      },
+      {
+        "period": "第四節",
+        "time": "11:10-12:00",
+        "course": "應用統計學",
+        "teacher": "陳春燕",
+        "location": "電707(承曦樓)"
+      },
+      {
+        "period": "第五節",
+        "time": "13:30-14:20",
+        "course": "機器學習與深度學習",
+        "teacher": "許晉龍",
+        "location": "電707(承曦樓)"
+      },
+      {
+        "period": "第六節",
+        "time": "14:25-15:15",
+        "course": "機器學習與深度學習",
+        "teacher": "許晉龍",
+        "location": "電707(承曦樓)"
+      },
+      {
+        "period": "第七節",
+        "time": "15:25-16:15",
+        "course": "機器學習與深度學習",
+        "teacher": "許晉龍",
+        "location": "電707(承曦樓)"
+      }
+    ],
+    "Wednesday": [
+      {
+        "period": "第一節",
+        "time": "08:10-09:00",
+        "course": "智慧工程與近代科技",
+        "teacher": "鄭明治",
+        "location": "承501"
+      },
+      {
+        "period": "第二節",
+        "time": "09:10-10:00",
+        "course": "智慧工程與近代科技",
+        "teacher": "鄭明治",
+        "location": "承501"
+      },
+      {
+        "period": "第五節",
+        "time": "13:30-14:20",
+        "course": "電子商務與網路行銷",
+        "teacher": "唐日新",
+        "location": "電708(承曦樓)"
+      },
+      {
+        "period": "第六節",
+        "time": "14:25-15:15",
+        "course": "電子商務與網路行銷",
+        "teacher": "唐日新",
+        "location": "電708(承曦樓)"
+      },
+      {
+        "period": "第七節",
+        "time": "15:25-16:15",
+        "course": "電子商務與網路行銷",
+        "teacher": "唐日新",
+        "location": "電708(承曦樓)"
+      }
+    ],
+    "Thursday": [
+      {
+        "period": "第二節",
+        "time": "09:10-10:00",
+        "course": "行動應用開發",
+        "teacher": "張庭君",
+        "location": "電401"
+      },
+      {
+        "period": "第三節",
+        "time": "10:10-11:00",
+        "course": "行動應用開發",
+        "teacher": "張庭君",
+        "location": "電401"
+      },
+      {
+        "period": "第四節",
+        "time": "11:10-12:00",
+        "course": "行動應用開發",
+        "teacher": "張庭君",
+        "location": "電401"
+      },
+      {
+        "period": "第五節",
+        "time": "13:30-14:20",
+        "course": "資訊網路",
+        "teacher": "訓思賢",
+        "location": "電703(承曦樓)"
+      },
+      {
+        "period": "第六節",
+        "time": "14:25-15:15",
+        "course": "資訊網路",
+        "teacher": "訓思賢",
+        "location": "電703(承曦樓)"
+      },
+      {
+        "period": "第七節",
+        "time": "15:25-16:15",
+        "course": "資訊網路",
+        "teacher": "訓思賢",
+        "location": "電703(承曦樓)"
+      }
+    ],
+    "Friday": [
+      {
+        "period": "第二節",
+        "time": "09:10-10:00",
+        "course": "Linux系統",
+        "teacher": "楊廷雄",
+        "location": "電708(承曦樓)"
+      },
+      {
+        "period": "第三節",
+        "time": "10:10-11:00",
+        "course": "Linux系統",
+        "teacher": "楊廷雄",
+        "location": "電708(承曦樓)"
+      },
+      {
+        "period": "第四節",
+        "time": "11:10-12:00",
+        "course": "Linux系統",
+        "teacher": "楊廷雄",
+        "location": "電708(承曦樓)"
+      },
+      {
+        "period": "第五節",
+        "time": "13:30-14:20",
+        "course": "資訊管理實務專題二",
+        "teacher": "林志宗",
+        "location": "待排教室"
+      },
+      {
+        "period": "第六節",
+        "time": "14:25-15:15",
+        "course": "資訊管理實務專題二",
+        "teacher": "林志宗",
+        "location": "待排教室"
+      }
+    ]
+  }
+}

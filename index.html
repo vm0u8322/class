@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>MochiClass Free</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <section class="topbar">
+        <div>
+          <p class="eyebrow">API-first class file manager</p>
+          <h1>MochiClass</h1>
+        </div>
+        <div class="status-strip">
+          <span id="fileCount">0 files</span>
+          <span id="matchCount">0 matched</span>
+          <span id="apiStatus">API 未連線</span>
+          <button id="resetAllButton" type="button">重新開始</button>
+        </div>
+      </section>
+
+      <nav class="view-switcher" aria-label="主要功能切換">
+        <button class="view-button active" type="button" data-view="schedule">課表</button>
+        <button class="view-button" type="button" data-view="files">上傳與佇列</button>
+        <button class="view-button" type="button" data-view="course">課程內容</button>
+      </nav>
+
+      <section class="workspace">
+        <aside class="left-panel app-view active" data-view-panel="schedule">
+          <div class="panel-head">
+            <h2>課表</h2>
+            <div class="schedule-actions">
+              <button id="applyScheduleButton" type="button">AI 解析課表</button>
+              <button id="localScheduleButton" type="button">本機備援</button>
+            </div>
+          </div>
+          <textarea id="scheduleTextInput" class="schedule-text" rows="8" spellcheck="false"></textarea>
+          <div id="scheduleStatus" class="schedule-status">可直接貼上整段課表，按「AI 解析課表」。</div>
+          <div id="scheduleGrid" class="schedule-grid"></div>
+        </aside>
+
+        <section class="center-panel app-view" data-view-panel="files">
+          <div class="api-panel">
+            <div class="panel-head compact">
+              <h2>VaultSage API 主連線</h2>
+              <button id="checkApiButton" type="button">重新檢查</button>
+            </div>
+            <div id="apiPanelStatus" class="api-panel-status">正式部署模式：API key 由後端環境變數提供，前端不保存 key。</div>
+          </div>
+
+          <div id="dropZone" class="drop-zone">
+            <div class="drop-mark">+</div>
+            <h2>上傳講義、照片、錄音、筆記</h2>
+            <p>API 連線後，上傳檔案會先依課表分類，再建立課程資料夾並送進 VaultSage；本機分類只是斷線時的備援。</p>
+            <button id="pickFilesButton" type="button">選擇檔案</button>
+            <input id="fileInput" type="file" multiple hidden />
+          </div>
+
+          <div class="panel-head compact">
+            <h2>檔案佇列</h2>
+            <button id="clearButton" type="button">清空</button>
+          </div>
+          <div id="fileList" class="file-list"></div>
+        </section>
+
+        <aside class="right-panel app-view" data-view-panel="course">
+          <div class="course-card">
+            <p class="eyebrow">目前課程</p>
+            <h2 id="courseTitle">請點一堂課</h2>
+            <p id="courseMeta">選擇課表中的課程後，這裡會整理相關講義、照片、錄音與筆記。</p>
+            <button id="downloadMediaButton" type="button">下載照片與錄音 ZIP</button>
+            <button id="syncCourseButton" type="button">重新同步這堂課</button>
+          </div>
+
+          <form id="askForm" class="ask-box">
+            <input id="questionInput" type="text" placeholder="問這堂課：期中重點是什麼？" />
+            <button type="submit">整理</button>
+          </form>
+          <div class="answer-container">
+            <button id="copyAnswerButton" class="copy-btn" type="button" title="複製內容">
+              <span class="copy-icon">📋</span> 複製
+            </button>
+            <div id="answerBox" class="answer-box">主流程是 API：課表負責分類，VaultSage 負責保存、檢索與問答；本機只保留分類狀態和展示備援。</div>
+          </div>
+
+          <div class="tabs" role="tablist" aria-label="資源分類">
+            <button class="tab active" data-type="all" type="button">全部</button>
+            <button class="tab" data-type="document" type="button">講義</button>
+            <button class="tab" data-type="image" type="button">照片</button>
+            <button class="tab" data-type="audio" type="button">錄音</button>
+            <button class="tab" data-type="note" type="button">筆記</button>
+          </div>
+          <div id="courseFiles" class="course-files"></div>
+        </aside>
+      </section>
+    </main>
+
+    <div id="previewModal" class="preview-modal" aria-hidden="true">
+      <div class="preview-backdrop" data-close-preview></div>
+      <section class="preview-dialog" role="dialog" aria-modal="true" aria-label="照片預覽">
+        <div class="preview-head">
+          <strong id="previewTitle">照片預覽</strong>
+          <button id="previewCloseButton" type="button" aria-label="關閉預覽">關閉</button>
+        </div>
+        <img id="previewImage" alt="課堂照片預覽" />
+      </section>
+    </div>
+
+    <script src="app.js?v=20260523-20"></script>
+  </body>
+</html>

@@ -1,0 +1,1632 @@
+const defaultSchedule = [
+  { id: "stats", day: "一", start: "09:10", end: "12:00", title: "統計學", room: "B302", keywords: ["統計", "stats", "statistics", "anova", "回歸"], sessions: [{ day: "一", start: "09:10", end: "12:00", room: "B302" }] },
+  { id: "ml", day: "二", start: "13:10", end: "16:00", title: "機器學習", room: "A508", keywords: ["機器學習", "ml", "machine", "模型", "分類"], sessions: [{ day: "二", start: "13:10", end: "16:00", room: "A508" }] },
+  { id: "english", day: "三", start: "10:10", end: "12:00", title: "英文簡報", room: "C201", keywords: ["英文", "english", "presentation", "簡報"], sessions: [{ day: "三", start: "10:10", end: "12:00", room: "C201" }] },
+  { id: "network", day: "五", start: "14:10", end: "17:00", title: "網路安全", room: "Lab 3", keywords: ["網路", "資安", "security", "packet", "防火牆"], sessions: [{ day: "五", start: "14:10", end: "17:00", room: "Lab 3" }] },
+];
+
+const demoFiles = [
+  { name: "統計學_ch3_抽樣分配講義.pdf", size: 1480000, lastModified: makeDate("2026-05-18", "10:04") },
+  { name: "IMG_統計學白板_20260518_1112.jpg", size: 3260000, lastModified: makeDate("2026-05-18", "11:12") },
+  { name: "機器學習_決策樹錄音.m4a", size: 18400000, lastModified: makeDate("2026-05-19", "14:22") },
+  { name: "ml_week8_notes.md", size: 21000, lastModified: makeDate("2026-05-19", "15:48") },
+  { name: "英文簡報_peer_review.docx", size: 840000, lastModified: makeDate("2026-05-20", "10:55") },
+  { name: "網路安全_firewall_lab_photo.png", size: 2940000, lastModified: makeDate("2026-05-22", "15:18") },
+];
+
+const state = {
+  schedule: defaultSchedule,
+  files: [],
+  selectedCourseId: defaultSchedule[0].id,
+  activeType: "all",
+  apiReady: false,
+  chatHistories: {}, // 每個課程的連續對話歷史
+  chatIds: {},       // 每個課程的對話 sessionId (chat_id)
+};
+
+const scheduleGrid = document.querySelector("#scheduleGrid");
+const fileList = document.querySelector("#fileList");
+const courseFiles = document.querySelector("#courseFiles");
+const courseTitle = document.querySelector("#courseTitle");
+const courseMeta = document.querySelector("#courseMeta");
+const fileCount = document.querySelector("#fileCount");
+const matchCount = document.querySelector("#matchCount");
+const fileInput = document.querySelector("#fileInput");
+const scheduleTextInput = document.querySelector("#scheduleTextInput");
+const scheduleStatus = document.querySelector("#scheduleStatus");
+const answerBox = document.querySelector("#answerBox");
+const apiStatus = document.querySelector("#apiStatus");
+const apiPanelStatus = document.querySelector("#apiPanelStatus");
+const checkApiButton = document.querySelector("#checkApiButton");
+const previewModal = document.querySelector("#previewModal");
+const previewImage = document.querySelector("#previewImage");
+const previewTitle = document.querySelector("#previewTitle");
+const previewCloseButton = document.querySelector("#previewCloseButton");
+const viewButtons = document.querySelectorAll(".view-button");
+const appViews = document.querySelectorAll(".app-view");
+
+const STORAGE_KEY = "mochiclass-state-v1";
+const SCHEDULE_CACHE_KEY = "mochiclass-schedule-cache-v1";
+const DB_NAME = "mochiclass-local-files";
+const DB_VERSION = 1;
+const FILE_STORE = "files";
+let persistTimer = null;
+let dbPromise = null;
+let isRestoring = false;
+let activeView = "schedule";
+
+const defaultScheduleText = `114學年度 第二學期 課表
+
+星期一
+第三節 10:10-11:00｜英文｜王雅涵｜視聽教室(國際樓)
+第四節 11:10-12:00｜英文｜王雅涵｜視聽教室(國際樓)
+第五節 13:30-14:20｜資料庫管理系統實作｜林柏宇｜電703(承曦樓)
+第六節 14:25-15:15｜資料庫管理系統實作｜林柏宇｜電703(承曦樓)
+第七節 15:25-16:15｜資料庫管理系統實作｜林柏宇｜電703(承曦樓)
+
+星期二
+第二節 09:10-10:00｜應用統計學｜陳冠廷｜電707(承曦樓)
+第三節 10:10-11:00｜應用統計學｜陳冠廷｜電707(承曦樓)
+第四節 11:10-12:00｜應用統計學｜陳冠廷｜電707(承曦樓)
+第五節 13:30-14:20｜機器學習與深度學習｜許家豪｜電707(承曦樓)
+第六節 14:25-15:15｜機器學習與深度學習｜許家豪｜電707(承曦樓)
+第七節 15:25-16:15｜機器學習與深度學習｜許家豪｜電707(承曦樓)
+
+星期三
+第一節 08:10-09:00｜智慧工程與近代科技｜張哲維｜承501
+第二節 09:10-10:00｜智慧工程與近代科技｜張哲維｜承501
+第五節 13:30-14:20｜電子商務與網路行銷｜李昱辰｜電708(承曦樓)
+第六節 14:25-15:15｜電子商務與網路行銷｜李昱辰｜電708(承曦樓)
+第七節 15:25-16:15｜電子商務與網路行銷｜李昱辰｜電708(承曦樓)
+
+星期四
+第二節 09:10-10:00｜行動應用開發｜黃子軒｜電401
+第三節 10:10-11:00｜行動應用開發｜黃子軒｜電401
+第四節 11:10-12:00｜行動應用開發｜黃子軒｜電401
+第五節 13:30-14:20｜資訊網路｜周柏翰｜電703(承曦樓)
+第六節 14:25-15:15｜資訊網路｜周柏翰｜電703(承曦樓)
+第七節 15:25-16:15｜資訊網路｜周柏翰｜電703(承曦樓)
+
+星期五
+第二節 09:10-10:00｜Linux系統｜蔡承恩｜電708(承曦樓)
+第三節 10:10-11:00｜Linux系統｜蔡承恩｜電708(承曦樓)
+第四節 11:10-12:00｜Linux系統｜蔡承恩｜電708(承曦樓)
+第五節 13:30-14:20｜資訊管理實務專題二｜吳柏霖｜待排教室
+第六節 14:25-15:15｜資訊管理實務專題二｜吳柏霖｜待排教室`;
+
+function makeDate(date, time) {
+  return new Date(`${date}T${time}:00+08:00`).getTime();
+}
+
+function openLocalDb() {
+  if (dbPromise) return dbPromise;
+  dbPromise = new Promise((resolve, reject) => {
+    const request = indexedDB.open(DB_NAME, DB_VERSION);
+    request.onupgradeneeded = () => {
+      const db = request.result;
+      if (!db.objectStoreNames.contains(FILE_STORE)) {
+        db.createObjectStore(FILE_STORE, { keyPath: "id" });
+      }
+    };
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+  return dbPromise;
+}
+
+async function putFileRecord(record) {
+  const db = await openLocalDb();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(FILE_STORE, "readwrite");
+    tx.objectStore(FILE_STORE).put(record);
+    tx.oncomplete = resolve;
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
+async function getAllFileRecords() {
+  const db = await openLocalDb();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(FILE_STORE, "readonly");
+    const request = tx.objectStore(FILE_STORE).getAll();
+    request.onsuccess = () => resolve(request.result || []);
+    request.onerror = () => reject(request.error);
+  });
+}
+
+async function clearFileRecords() {
+  const db = await openLocalDb();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(FILE_STORE, "readwrite");
+    tx.objectStore(FILE_STORE).clear();
+    tx.oncomplete = resolve;
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
+function serializeFileMeta(file) {
+  return {
+    id: file.id,
+    name: file.name,
+    size: file.size,
+    lastModified: file.lastModified,
+    type: file.type,
+    courseId: file.courseId,
+    confidence: file.confidence,
+    reasons: file.reasons,
+    vaultFileId: file.vaultFileId,
+    uploadStatus: file.uploadStatus,
+    sourceText: file.sourceText || "",
+  };
+}
+
+function persistStateSoon() {
+  if (isRestoring) return;
+  clearTimeout(persistTimer);
+  persistTimer = setTimeout(() => {
+    persistState().catch((error) => {
+      console.warn("Persist failed:", error);
+    });
+  }, 250);
+}
+
+async function persistState() {
+  const appState = {
+    schedule: state.schedule,
+    selectedCourseId: state.selectedCourseId,
+    activeType: state.activeType,
+    activeView,
+    scheduleText: scheduleTextInput.value,
+    files: state.files.map(serializeFileMeta),
+    chatHistories: state.chatHistories,
+    chatIds: state.chatIds,
+  };
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(appState));
+
+  for (const file of state.files) {
+    await putFileRecord({
+      ...serializeFileMeta(file),
+      blob: file.sourceFile || null,
+      mimeType: file.sourceFile?.type || "",
+    });
+  }
+}
+
+function scheduleCacheKey(text) {
+  return String(text || "").trim();
+}
+
+function getCachedSchedule(text) {
+  try {
+    const cache = JSON.parse(localStorage.getItem(SCHEDULE_CACHE_KEY) || "{}");
+    return cache[scheduleCacheKey(text)] || null;
+  } catch {
+    return null;
+  }
+}
+
+function setCachedSchedule(text, courses) {
+  try {
+    const key = scheduleCacheKey(text);
+    const cache = JSON.parse(localStorage.getItem(SCHEDULE_CACHE_KEY) || "{}");
+    cache[key] = courses;
+    localStorage.setItem(SCHEDULE_CACHE_KEY, JSON.stringify(cache));
+  } catch {
+    // Cache is best effort.
+  }
+}
+
+async function restoreState() {
+  isRestoring = true;
+  try {
+    const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || "null");
+    if (!saved) {
+      scheduleTextInput.value = defaultScheduleText;
+      return;
+    }
+    state.schedule = Array.isArray(saved.schedule) && saved.schedule.length ? saved.schedule : defaultSchedule;
+    state.selectedCourseId = saved.selectedCourseId || state.schedule[0]?.id || null;
+    state.activeType = saved.activeType || "all";
+    activeView = saved.activeView || "schedule";
+    scheduleTextInput.value = saved.scheduleText || defaultScheduleText;
+    state.chatHistories = saved.chatHistories || {};
+    state.chatIds = saved.chatIds || {};
+
+    const records = await getAllFileRecords();
+    const recordById = new Map(records.map((record) => [record.id, record]));
+    
+    // 載入時去重，自動淨化歷史重複數據，避免 UI 及 Prompt 膨脹
+    const seenNames = new Set();
+    const uniqueMetas = [];
+    for (const meta of (saved.files || [])) {
+      if (!seenNames.has(meta.name)) {
+        seenNames.add(meta.name);
+        uniqueMetas.push(meta);
+      }
+    }
+
+    state.files = uniqueMetas.map((meta) => {
+      const record = recordById.get(meta.id);
+      const sourceFile = record?.blob
+        ? new File([record.blob], meta.name, { type: record.mimeType || record.blob.type || "application/octet-stream", lastModified: meta.lastModified || Date.now() })
+        : null;
+      return {
+        ...meta,
+        sourceFile,
+        previewUrl: meta.type === "image" && sourceFile ? URL.createObjectURL(sourceFile) : null,
+        sourceText: meta.sourceText || record?.sourceText || "",
+      };
+    });
+    scheduleStatus.textContent = "已還原上次的課表與檔案。";
+    answerBox.textContent = "資料已從本機還原；按「重新開始」才會清空。";
+  } finally {
+    isRestoring = false;
+  }
+}
+
+function inferType(name) {
+  const lower = name.toLowerCase();
+  if (/\.(jpg|jpeg|png|webp|heic|gif)$/.test(lower)) return "image";
+  if (/\.(mp3|wav|m4a|aac|flac|ogg)$/.test(lower)) return "audio";
+  if (/\.(md|txt|rtf)$/.test(lower)) return "note";
+  return "document";
+}
+
+function formatDate(ms) {
+  if (!ms) return "沒有時間";
+  return new Intl.DateTimeFormat("zh-TW", {
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(new Date(ms));
+}
+
+function switchView(viewName, shouldScroll = false) {
+  activeView = viewName;
+  viewButtons.forEach((button) => {
+    button.classList.toggle("active", button.dataset.view === viewName);
+  });
+  appViews.forEach((view) => {
+    view.classList.toggle("active", view.dataset.viewPanel === viewName);
+  });
+  if (shouldScroll) {
+    const target = document.querySelector(`[data-view-panel="${viewName}"]`);
+    target?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+}
+
+function dayIndexFromChinese(day) {
+  return ["日", "一", "二", "三", "四", "五", "六"].indexOf(day);
+}
+
+function minutesOfDay(time) {
+  const [hour, minute] = time.split(":").map(Number);
+  return hour * 60 + minute;
+}
+
+function normalizeDay(text) {
+  const source = String(text || "").trim();
+  const anchored = source.match(/^(?:週|星期|禮拜)?\s*([一二三四五六日天])(?:\s|[　,，、:：\-－~到至]|\d|$)/);
+  const explicit = source.match(/(?:週|星期|禮拜)\s*([一二三四五六日天])/);
+  const match = anchored || explicit;
+  if (!match) return "";
+  return match[1] === "天" ? "日" : match[1];
+}
+
+function stripLeadingDay(text) {
+  return text
+    .replace(/^\s*(?:週|星期|禮拜)?\s*[一二三四五六日天](?:\s|[　,，、:：\-－~到至])?/, " ")
+    .replace(/(?:週|星期|禮拜)\s*[一二三四五六日天]/, " ");
+}
+
+function normalizeTime(text) {
+  const match = text.match(/(\d{1,2})[:：](\d{2})/);
+  if (!match) return "";
+  return `${match[1].padStart(2, "0")}:${match[2]}`;
+}
+
+function parseScheduleText(text) {
+  const courses = [];
+  const lines = text.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+  let currentDay = "";
+
+  lines.forEach((line, index) => {
+    const normalizedLine = line.replace(/^\*\s*/, "").trim();
+    const dayHeader = normalizedLine.match(/^(?:週|星期|禮拜)\s*([一二三四五六日天])$/);
+    if (dayHeader) {
+      currentDay = dayHeader[1] === "天" ? "日" : dayHeader[1];
+      return;
+    }
+
+    const day = normalizeDay(normalizedLine) || currentDay;
+    const times = [...line.matchAll(/(\d{1,2}[:：]\d{2})/g)].map((match) => normalizeTime(match[1]));
+    if (!day || times.length < 2) return;
+
+    const fields = normalizedLine.split(/[｜|]/).map((part) => part.trim()).filter(Boolean);
+    if (fields.length >= 3) {
+      const title = fields[1];
+      const teacher = fields[2] || "";
+      const room = fields[3] || "未填教室";
+      courses.push({
+        id: `course-${index}-${title}`.replace(/[^\w\u4e00-\u9fa5-]/g, "-"),
+        day,
+        start: times[0],
+        end: times[1],
+        title,
+        room,
+        keywords: [...new Set([title, teacher].filter(Boolean))],
+        sessions: [{ day, start: times[0], end: times[1], room }],
+      });
+      return;
+    }
+
+    const keywordMatch = normalizedLine.match(/(?:關鍵字|keywords?)\s*[:：]\s*(.+)$/i);
+    const keywordText = keywordMatch ? keywordMatch[1] : "";
+    const beforeKeywords = keywordMatch ? normalizedLine.slice(0, keywordMatch.index).trim() : normalizedLine;
+    const withoutDayTime = beforeKeywords
+      .replace(/^\s*(?:週|星期|禮拜)?\s*[一二三四五六日天](?:\s|[　,，、:：\-－~到至])?/, " ")
+      .replace(/(?:週|星期|禮拜)\s*[一二三四五六日天]/, " ")
+      .replace(/\d{1,2}[:：]\d{2}\s*[-~－到至]\s*\d{1,2}[:：]\d{2}/, " ")
+      .replace(/\d{1,2}[:：]\d{2}/g, " ")
+      .trim();
+
+    const parts = withoutDayTime.split(/\s+/).filter(Boolean);
+    const title = parts[0] || `課程 ${index + 1}`;
+    const room = parts.slice(1).join(" ") || "未填教室";
+    const keywords = [
+      title,
+      ...keywordText.split(/[,，、\s]+/).map((item) => item.trim()).filter(Boolean),
+    ];
+
+    courses.push({
+      id: `course-${index}-${title}`.replace(/[^\w\u4e00-\u9fa5-]/g, "-"),
+      day,
+      start: times[0],
+      end: times[1],
+      title,
+      room,
+      keywords: [...new Set(keywords)],
+      sessions: [{ day, start: times[0], end: times[1], room }],
+    });
+  });
+
+  return courses;
+}
+
+function courseKey(title) {
+  return String(title || "").trim().replace(/\s+/g, "").toLowerCase();
+}
+
+function mergeSameTitleCourses(courses) {
+  const merged = new Map();
+  for (const course of courses) {
+    const key = courseKey(course.title);
+    if (!key) continue;
+    const sessions = course.sessions?.length
+      ? course.sessions
+      : [{ day: course.day, start: course.start, end: course.end, room: course.room || "未填教室" }];
+    if (!merged.has(key)) {
+      merged.set(key, {
+        ...course,
+        id: `course-${key}`.replace(/[^\w\u4e00-\u9fa5-]/g, "-"),
+        sessions: [],
+        keywords: [],
+      });
+    }
+    const target = merged.get(key);
+    target.sessions.push(...sessions);
+    target.keywords.push(...(course.keywords || []), course.title);
+  }
+
+  return Array.from(merged.values()).map((course) => {
+    const firstSession = course.sessions[0];
+    return {
+      ...course,
+      day: firstSession.day,
+      start: firstSession.start,
+      end: firstSession.end,
+      room: firstSession.room || course.room || "未填教室",
+      keywords: [...new Set(course.keywords.map((item) => String(item).trim()).filter(Boolean))],
+    };
+  });
+}
+
+function formatSessions(course) {
+  const sessions = course.sessions?.length
+    ? course.sessions
+    : [{ day: course.day, start: course.start, end: course.end, room: course.room }];
+  return sessions.map((session) => `${session.day} ${session.start}-${session.end}${session.room ? ` ${session.room}` : ""}`).join(" / ");
+}
+
+function extractJson(text) {
+  try {
+    let clean = String(text || "").trim();
+    if (clean.startsWith("```")) {
+      clean = clean.replace(/^```(?:json)?/i, "").replace(/```$/i, "").trim();
+    }
+    const firstBracket = clean.indexOf("[");
+    const lastBracket = clean.lastIndexOf("]");
+    if (firstBracket >= 0 && lastBracket > firstBracket) {
+      clean = clean.slice(firstBracket, lastBracket + 1);
+    } else {
+      const firstBrace = clean.indexOf("{");
+      const lastBrace = clean.lastIndexOf("}");
+      if (firstBrace >= 0 && lastBrace > firstBrace) {
+        clean = clean.slice(firstBrace, lastBrace + 1);
+      }
+    }
+    return JSON.parse(clean);
+  } catch {
+    return null;
+  }
+}
+
+function normalizeParsedCourses(parsed, sourceText = "") {
+  if (!Array.isArray(parsed)) return [];
+  const localCourses = parseScheduleText(sourceText);
+  return parsed.map((course, index) => {
+    const local = localCourses[index];
+    const title = String(course.title || course.course || course.name || `課程 ${index + 1}`).trim();
+    const day = local?.day || normalizeDay(String(course.day || course.weekday || ""));
+    const start = local?.start || normalizeTime(String(course.start || course.start_time || ""));
+    const end = local?.end || normalizeTime(String(course.end || course.end_time || ""));
+    const rawKeywords = Array.isArray(course.keywords) ? course.keywords : String(course.keywords || "").split(/[,，、\s]+/);
+    if (!title || !day || !start || !end) return null;
+    return {
+      id: String(course.id || `course-${index}-${title}`).replace(/[^\w\u4e00-\u9fa5-]/g, "-"),
+      day,
+      start,
+      end,
+      title,
+      room: String(course.room || course.location || local?.room || "未填教室").trim(),
+      keywords: [...new Set([title, ...(local?.keywords || []), ...rawKeywords.map((item) => String(item).trim()).filter(Boolean)])],
+      sessions: [{ day, start, end, room: String(course.room || course.location || local?.room || "未填教室").trim() }],
+    };
+  }).filter(Boolean);
+}
+
+function setSchedule(courses, message) {
+  const mergedCourses = mergeSameTitleCourses(courses);
+  state.schedule = mergedCourses;
+  state.selectedCourseId = mergedCourses[0]?.id || null;
+  state.files = state.files.map(classifyFile);
+  const mergedCount = courses.length - mergedCourses.length;
+  const finalMessage = mergedCount > 0 ? `${message} 同名科目已合併 ${mergedCount} 個分時段。` : message;
+  answerBox.textContent = finalMessage;
+  scheduleStatus.textContent = finalMessage;
+  render();
+  setCachedSchedule(scheduleTextInput.value, mergedCourses);
+  persistStateSoon();
+}
+
+function applyLocalScheduleText() {
+  const text = scheduleTextInput.value.trim();
+  if (!text) {
+    answerBox.textContent = "請先貼上或打字輸入課表。";
+    scheduleStatus.textContent = "請先貼上或打字輸入課表。";
+    return;
+  }
+  const parsed = parseScheduleText(text);
+  if (!parsed.length) {
+    answerBox.textContent = "本機備援看不懂這份課表。請用類似「週一 09:10-12:00 統計學 B302 關鍵字: 回歸, anova」的格式。";
+    scheduleStatus.textContent = "本機備援解析失敗。";
+    return;
+  }
+  setSchedule(parsed, `已用本機規則讀懂 ${parsed.length} 堂課，並重新配對目前檔案。`);
+}
+
+async function applyScheduleText() {
+  const button = document.querySelector("#applyScheduleButton");
+  const text = scheduleTextInput.value.trim();
+  if (!text) {
+    answerBox.textContent = "請先貼上或打字輸入課表。";
+    scheduleStatus.textContent = "請先貼上或打字輸入課表。";
+    return;
+  }
+  if (!state.apiReady) {
+    answerBox.textContent = "API 尚未連線，所以這次沒有用 AI。請確認後端 .env 或部署平台環境變數已設定 VAULTSAGE_API_KEY。";
+    scheduleStatus.textContent = "API 未連線：AI 解析沒有執行。";
+    return;
+  }
+
+  const cached = getCachedSchedule(text);
+  if (cached?.length) {
+    setSchedule(cached, `已使用快取課表，讀懂 ${cached.length} 堂課。`);
+    return;
+  }
+
+  button.disabled = true;
+  button.textContent = "解析中...";
+  scheduleStatus.textContent = "正在用 VaultSage API 解析課表...";
+  answerBox.textContent = "正在用 VaultSage API 解析課表文字...";
+  try {
+    const result = await apiFetch("/api/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        question: `請把以下學生課表文字解析成純 JSON 陣列，不要加 Markdown，不要解釋。每個物件必須包含 id, day, start, end, title, room, keywords。day 必須忠實使用原文中的星期，不能根據日期自行推算，且只能是一、二、三、四、五、六、日。start/end 用 HH:MM。keywords 是字串陣列，至少包含課名與可能出現在檔名中的關鍵字。\n\n課表文字：\n${text}`,
+        file_ids: [],
+      }),
+    });
+    const apiCourses = normalizeParsedCourses(extractJson(result.answer), text);
+    if (apiCourses.length) {
+      setSchedule(apiCourses, `API 已讀懂 ${apiCourses.length} 堂課，並重新配對目前檔案。`);
+      return;
+    }
+    answerBox.textContent = "API 有回覆，但不是可用 JSON；沒有套用本機規則。";
+    scheduleStatus.textContent = "API 回覆無法轉成課表。";
+  } catch (error) {
+    answerBox.textContent = `API 課表解析失敗：${error.message}`;
+    scheduleStatus.textContent = "API 解析失敗，請檢查 key 或 API 狀態。";
+  } finally {
+    button.disabled = false;
+    button.textContent = "AI 解析課表";
+  }
+}
+
+function scoreFileForCourse(file, course) {
+  const name = file.name.toLowerCase();
+  const content = String(file.sourceText || "").toLowerCase();
+  let score = 0;
+  const reasons = [];
+
+  for (const keyword of [course.title, ...(course.keywords || [])]) {
+    if (keyword && name.includes(keyword.toLowerCase())) {
+      score += 4;
+      reasons.push(`檔名含「${keyword}」`);
+      break;
+    }
+  }
+
+  for (const keyword of [course.title, ...(course.keywords || [])]) {
+    if (keyword && content.includes(keyword.toLowerCase())) {
+      score += 6;
+      reasons.push(`內容提到「${keyword}」`);
+      break;
+    }
+  }
+
+  if (file.lastModified) {
+    const date = new Date(file.lastModified);
+    const minute = date.getHours() * 60 + date.getMinutes();
+    const sessions = course.sessions?.length
+      ? course.sessions
+      : [{ day: course.day, start: course.start, end: course.end }];
+    const sameDaySession = sessions.find((session) => date.getDay() === dayIndexFromChinese(session.day));
+    const inWindowSession = sessions.find((session) => (
+      date.getDay() === dayIndexFromChinese(session.day)
+      && minute >= minutesOfDay(session.start) - 20
+      && minute <= minutesOfDay(session.end) + 20
+    ));
+    if (inWindowSession) {
+      score += 3;
+      reasons.push(`拍攝/建立時間落在 ${inWindowSession.day} ${inWindowSession.start}-${inWindowSession.end}`);
+    } else if (sameDaySession) {
+      score += 1;
+      reasons.push("同一天建立");
+    }
+  }
+
+  return { score, reasons };
+}
+
+function courseOptionsForAi() {
+  return state.schedule.map((course) => ({
+    id: course.id,
+    title: course.title,
+    time: formatSessions(course),
+    room: course.room,
+    keywords: course.keywords || [],
+  }));
+}
+
+async function classifyTextFilesByApi(files) {
+  const targets = files.filter((file) => file.sourceText && !file.vaultFileId);
+  if (!targets.length) return;
+
+  answerBox.textContent = `正在用 API 讀取 ${targets.length} 份文字講義內容並判斷科目...`;
+  for (const file of targets) {
+    const excerpt = file.sourceText.slice(0, 2600);
+    const result = await apiFetch("/api/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        question: `你是學生課堂檔案分類器。請閱讀一份講義內容，從候選課程中選出最適合的一門課。不要只靠檔名，也不要要求內容必須完整出現課名；請根據主題、術語、老師、作業內容、技術詞彙推斷。\n\n請只回傳純 JSON 物件，不要 Markdown：\n{\"course_id\":\"候選課程 id\", \"confidence\":0-100, \"reason\":\"一句繁體中文理由\"}\n\n候選課程：\n${JSON.stringify(courseOptionsForAi(), null, 2)}\n\n檔名：${file.name}\n講義內容：\n${excerpt}`,
+        file_ids: [],
+      }),
+    });
+    const parsed = extractJson(result.answer);
+    const matchedCourse = parsed?.course_id ? courseById(parsed.course_id) : null;
+    if (matchedCourse) {
+      file.courseId = matchedCourse.id;
+      file.confidence = Number(parsed.confidence) || file.confidence || 70;
+      file.reasons = [`API 內容判斷：${parsed.reason || matchedCourse.title}`];
+    }
+  }
+}
+
+function classifyFile(fileLike) {
+  const type = inferType(fileLike.name);
+  const sourceFile = fileLike.sourceFile || (fileLike instanceof File ? fileLike : null);
+  // 優先沿用已存在的 previewUrl，避免重複創建 Blob URL 造成 ERR_FILE_NOT_FOUND
+  const previewUrl = fileLike.previewUrl || (type === "image" && sourceFile ? URL.createObjectURL(sourceFile) : null);
+  let best = { course: null, score: 0, reasons: [] };
+  for (const course of state.schedule) {
+    const result = scoreFileForCourse(fileLike, course);
+    if (result.score > best.score) {
+      best = { course, score: result.score, reasons: result.reasons };
+    }
+  }
+  return {
+    id: crypto.randomUUID(),
+    name: fileLike.name,
+    size: fileLike.size || 0,
+    lastModified: fileLike.lastModified || 0,
+    type,
+    courseId: best.score > 0 ? best.course.id : null,
+    confidence: Math.min(99, best.score * 18),
+    reasons: best.reasons,
+    sourceFile,
+    previewUrl,
+    sourceText: fileLike.sourceText || "",
+    vaultFileId: fileLike.vaultFileId || null,
+    uploadStatus: fileLike.uploadStatus || "local",
+  };
+}
+
+function fileCardHtml(file) {
+  const preview = file.type === "image" && file.previewUrl
+    ? `<img class="file-thumb" src="${file.previewUrl}" alt="${file.name}">`
+    : "";
+  const previewHint = file.type === "image" && file.previewUrl ? " / 點擊預覽" : "";
+  return `
+    <article class="file-item type-${file.type} ${file.previewUrl ? "is-previewable" : ""}" data-file-id="${file.id}">
+      ${preview}
+      <strong>${file.name}</strong>
+      <small>${typeLabel(file.type)} / ${formatDate(file.lastModified)}${previewHint}</small>
+      <div class="match">${file.vaultFileId ? `已同步 API：${file.vaultFileId.slice(0, 8)}` : file.reasons.join("、")}</div>
+    </article>
+  `;
+}
+
+function bindPreviewClicks(container) {
+  container.querySelectorAll(".file-item.is-previewable").forEach((item) => {
+    item.addEventListener("click", () => {
+      const file = state.files.find((candidate) => candidate.id === item.dataset.fileId);
+      if (file?.previewUrl) {
+        openPreview(file);
+      }
+    });
+  });
+}
+
+function openPreview(file) {
+  previewTitle.textContent = file.name;
+  previewImage.src = file.previewUrl;
+  previewImage.alt = file.name;
+  previewModal.classList.add("is-open");
+  previewModal.setAttribute("aria-hidden", "false");
+}
+
+function closePreview() {
+  previewModal.classList.remove("is-open");
+  previewModal.setAttribute("aria-hidden", "true");
+  previewImage.removeAttribute("src");
+}
+
+function crc32(bytes) {
+  let crc = -1;
+  for (let i = 0; i < bytes.length; i += 1) {
+    crc ^= bytes[i];
+    for (let j = 0; j < 8; j += 1) {
+      crc = (crc >>> 1) ^ (0xedb88320 & -(crc & 1));
+    }
+  }
+  return (crc ^ -1) >>> 0;
+}
+
+function dosDateTime(date = new Date()) {
+  const time = (date.getHours() << 11) | (date.getMinutes() << 5) | Math.floor(date.getSeconds() / 2);
+  const day = ((date.getFullYear() - 1980) << 9) | ((date.getMonth() + 1) << 5) | date.getDate();
+  return { time, day };
+}
+
+function writeU16(target, offset, value) {
+  target[offset] = value & 0xff;
+  target[offset + 1] = (value >>> 8) & 0xff;
+}
+
+function writeU32(target, offset, value) {
+  target[offset] = value & 0xff;
+  target[offset + 1] = (value >>> 8) & 0xff;
+  target[offset + 2] = (value >>> 16) & 0xff;
+  target[offset + 3] = (value >>> 24) & 0xff;
+}
+
+function sanitizeZipName(name) {
+  return String(name || "file").replace(/[\\/:*?"<>|]/g, "_");
+}
+
+async function createZipBlob(entries) {
+  const encoder = new TextEncoder();
+  const chunks = [];
+  const central = [];
+  let offset = 0;
+
+  for (const entry of entries) {
+    const nameBytes = encoder.encode(entry.path);
+    const data = new Uint8Array(await entry.file.arrayBuffer());
+    const crc = crc32(data);
+    const { time, day } = dosDateTime(new Date(entry.file.lastModified || Date.now()));
+
+    const local = new Uint8Array(30 + nameBytes.length);
+    writeU32(local, 0, 0x04034b50);
+    writeU16(local, 4, 20);
+    writeU16(local, 8, 0);
+    writeU16(local, 10, time);
+    writeU16(local, 12, day);
+    writeU32(local, 14, crc);
+    writeU32(local, 18, data.length);
+    writeU32(local, 22, data.length);
+    writeU16(local, 26, nameBytes.length);
+    local.set(nameBytes, 30);
+    chunks.push(local, data);
+
+    const header = new Uint8Array(46 + nameBytes.length);
+    writeU32(header, 0, 0x02014b50);
+    writeU16(header, 4, 20);
+    writeU16(header, 6, 20);
+    writeU16(header, 10, 0);
+    writeU16(header, 12, time);
+    writeU16(header, 14, day);
+    writeU32(header, 16, crc);
+    writeU32(header, 20, data.length);
+    writeU32(header, 24, data.length);
+    writeU16(header, 28, nameBytes.length);
+    writeU32(header, 42, offset);
+    header.set(nameBytes, 46);
+    central.push(header);
+    offset += local.length + data.length;
+  }
+
+  const centralSize = central.reduce((sum, item) => sum + item.length, 0);
+  const centralOffset = offset;
+  const end = new Uint8Array(22);
+  writeU32(end, 0, 0x06054b50);
+  writeU16(end, 8, entries.length);
+  writeU16(end, 10, entries.length);
+  writeU32(end, 12, centralSize);
+  writeU32(end, 16, centralOffset);
+  return new Blob([...chunks, ...central, end], { type: "application/zip" });
+}
+
+async function downloadSelectedCourseMediaZip() {
+  const course = courseById(state.selectedCourseId);
+  if (!course) return;
+  const mediaFiles = state.files.filter((file) => (
+    file.courseId === course.id
+    && (file.type === "image" || file.type === "audio")
+    && file.sourceFile
+  ));
+  if (!mediaFiles.length) {
+    answerBox.textContent = "這堂課沒有可打包的本機照片或錄音。示範檔沒有實際檔案內容，請拖入真實檔案後再下載。";
+    return;
+  }
+
+  answerBox.textContent = `正在打包「${course.title}」的 ${mediaFiles.length} 個照片/錄音檔...`;
+  const entries = mediaFiles.map((file) => ({
+    path: `${file.type === "image" ? "photos" : "audio"}/${sanitizeZipName(file.name)}`,
+    file: file.sourceFile,
+  }));
+  const zip = await createZipBlob(entries);
+  const url = URL.createObjectURL(zip);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `${sanitizeZipName(course.title)}_photos_audio.zip`;
+  link.click();
+  URL.revokeObjectURL(url);
+  answerBox.textContent = `已下載「${course.title}」照片與錄音 ZIP。`;
+}
+
+function releaseFilePreviews(files = state.files) {
+  files.forEach((file) => {
+    if (file.previewUrl) URL.revokeObjectURL(file.previewUrl);
+  });
+}
+
+async function enrichFileLike(fileLike) {
+  if (!(fileLike instanceof File)) return fileLike;
+  const lower = fileLike.name.toLowerCase();
+  const shouldReadText = fileLike.type.startsWith("text/") || /\.(txt|md|csv|json)$/i.test(lower);
+  const isImage = /\.(jpg|jpeg|png|webp|heic|gif)$/i.test(lower) || fileLike.type.startsWith("image/");
+  const isAudio = /\.(mp3|wav|m4a|aac|flac|ogg)$/i.test(lower) || fileLike.type.startsWith("audio/");
+  const isPdf = lower.endsWith(".pdf") || fileLike.type === "application/pdf";
+
+  try {
+    if (shouldReadText) {
+      fileLike.sourceText = await fileLike.text();
+    } else if (isPdf || isImage || isAudio) {
+      const form = new FormData();
+      form.append("file", fileLike);
+      const result = await apiFetch("/api/extract-text", { method: "POST", body: form });
+      fileLike.sourceText = result.text || "";
+    }
+  } catch {
+    fileLike.sourceText = "";
+  }
+  return fileLike;
+}
+
+async function addFiles(files) {
+  const rawListArray = Array.from(files);
+  if (!rawListArray.length) return;
+
+  // 加入去重過濾，防止佇列重複與 Prompt 膨脹
+  const fileListArray = rawListArray.filter(f => {
+    const isDup = state.files.some(existing => existing.name === f.name);
+    if (isDup) {
+      console.log(`檔案重複已跳過: ${f.name}`);
+    }
+    return !isDup;
+  });
+
+  if (!fileListArray.length) {
+    answerBox.textContent = "上傳的檔案都已經存在於佇列中，已自動跳過重複檔案。";
+    return;
+  }
+
+  // 1. 瞬間將所有檔案加入佇列，更新 UI 並切換分頁，給使用者即時的反饋！
+  const newFiles = fileListArray.map((f) => classifyFile(f));
+  newFiles.forEach((file) => {
+    file.uploadStatus = "pending";
+  });
+  state.files.push(...newFiles);
+  render();
+  switchView("files", true);
+  
+  answerBox.textContent = `已加入 ${newFiles.length} 個檔案，正在背景排隊進行文字辨識與 AI 分析...`;
+
+  // 2. 逐一在背景處理每個檔案，使介面保持完美響應，不卡死！
+  for (const file of newFiles) {
+    if (file.sourceFile) {
+      try {
+        file.uploadStatus = "processing";
+        render();
+
+        // 呼叫後端 API 進行 OCR / 語音轉文字
+        await enrichFileLike(file.sourceFile);
+        file.sourceText = file.sourceFile.sourceText || "";
+
+        // 根據提取出的文字重新進行本機分類與評分
+        const reClassified = classifyFile({
+          name: file.name,
+          size: file.size,
+          lastModified: file.lastModified,
+          sourceFile: file.sourceFile,
+          sourceText: file.sourceText
+        });
+        
+        file.courseId = reClassified.courseId;
+        file.confidence = reClassified.confidence;
+        file.reasons = reClassified.reasons;
+        file.uploadStatus = "local";
+        render();
+
+        // 如果 API 已連線，執行 AI 分類與自動同步
+        if (state.apiReady) {
+          try {
+            await classifyTextFilesByApi([file]);
+            render();
+          } catch (err) {
+            console.warn("API classification failed for file:", file.name, err);
+          }
+          try {
+            await syncFilesToApi([file]);
+            render();
+          } catch (err) {
+            console.warn("API sync failed for file:", file.name, err);
+          }
+        }
+      } catch (err) {
+        console.error(`處理檔案失敗: ${file.name}`, err);
+        file.uploadStatus = "failed";
+        render();
+      }
+    }
+  }
+
+  answerBox.textContent = `佇列中的 ${newFiles.length} 個檔案已全部完成背景分析與同步！`;
+}
+
+async function loadSampleCourseDocs() {
+  try {
+    const docs = await apiFetch("/api/sample-docs");
+    if (!docs.length) {
+      answerBox.textContent = "找不到亂碼講義範例。";
+      return;
+    }
+    const files = docs.map((doc) => {
+      const binary = atob(doc.data_base64 || "");
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i += 1) {
+        bytes[i] = binary.charCodeAt(i);
+      }
+      const file = new File([bytes], doc.name, { type: doc.content_type || "application/pdf", lastModified: Date.now() });
+      file.sourceText = doc.content || "";
+      return file;
+    });
+    await addFiles(files);
+    answerBox.textContent = `已載入 ${files.length} 份亂碼檔名 PDF 講義。檔名不含課名，適合測 API 內容分析分類。`;
+  } catch (error) {
+    answerBox.textContent = `載入亂碼講義失敗：${error.message}`;
+  }
+}
+
+function courseById(id) {
+  return state.schedule.find((course) => course.id === id);
+}
+
+function typeLabel(type) {
+  return {
+    document: "講義",
+    image: "照片",
+    audio: "錄音",
+    note: "筆記",
+  }[type] || "檔案";
+}
+
+function renderSchedule() {
+  scheduleGrid.innerHTML = state.schedule.map((course) => {
+    const files = state.files.filter((file) => file.courseId === course.id);
+    const active = state.selectedCourseId === course.id ? "active" : "";
+    return `
+      <article class="course-slot ${active}" data-course="${course.id}">
+        <strong>${course.title}</strong>
+        <small>${formatSessions(course)} / ${files.length} 份資料</small>
+        <div class="badge-row">
+          <span class="badge">講義 ${files.filter((f) => f.type === "document").length}</span>
+          <span class="badge">照片 ${files.filter((f) => f.type === "image").length}</span>
+          <span class="badge">錄音 ${files.filter((f) => f.type === "audio").length}</span>
+          <span class="badge">筆記 ${files.filter((f) => f.type === "note").length}</span>
+        </div>
+      </article>
+    `;
+  }).join("");
+
+  scheduleGrid.querySelectorAll(".course-slot").forEach((slot) => {
+    slot.addEventListener("click", () => {
+      state.selectedCourseId = slot.dataset.course;
+      
+      // 切換課程時，重設問答輸入框與提示，給使用者更清晰引導與直覺的體驗！
+      const course = courseById(state.selectedCourseId);
+      if (course) {
+        const qInput = document.querySelector("#questionInput");
+        if (qInput) qInput.value = "";
+        showAnswer(`已切換至「${course.title}」。您可以於上方輸入問題並點選「整理」，我將根據本課堂上傳的講義、白板照片 OCR 文字或錄音逐字稿，為您快速梳理重點！`, false);
+      }
+      
+      render();
+      switchView("course", true);
+    });
+  });
+}
+
+function renderFiles() {
+  if (!state.files.length) {
+    fileList.innerHTML = `<div class="empty">還沒有檔案。請上傳你的講義、照片、錄音或筆記。</div>`;
+    return;
+  }
+
+  fileList.innerHTML = state.files.map((file) => {
+    const course = courseById(file.courseId);
+    return `
+      <article class="file-item type-${file.type} ${file.previewUrl ? "is-previewable" : ""}" data-file-id="${file.id}">
+        ${file.type === "image" && file.previewUrl ? `<img class="file-thumb" src="${file.previewUrl}" alt="${file.name}">` : ""}
+        <strong>${file.name}</strong>
+        <small>${typeLabel(file.type)} / ${formatDate(file.lastModified)}${file.previewUrl ? " / 點擊預覽" : ""}</small>
+        <div class="match">${course ? `配到：${course.title}，信心 ${file.confidence}%` : "尚未配到課程"}</div>
+        <small>${file.reasons.join("、") || "沒有明顯關鍵字或時間線索"} / ${file.vaultFileId ? `API: ${file.vaultFileId.slice(0, 8)}` : file.uploadStatus}</small>
+      </article>
+    `;
+  }).join("");
+  bindPreviewClicks(fileList);
+}
+
+function renderCourseDetail() {
+  const course = courseById(state.selectedCourseId);
+  if (!course) return;
+
+  const files = state.files.filter((file) => file.courseId === course.id);
+  const visible = state.activeType === "all" ? files : files.filter((file) => file.type === state.activeType);
+  courseTitle.textContent = course.title;
+  courseMeta.textContent = `${formatSessions(course)} / 關鍵字：${course.keywords.join("、")}`;
+
+  if (!visible.length) {
+    courseFiles.innerHTML = `<div class="empty">這個分類目前沒有資料。</div>`;
+    renderChatHistory(course.id);
+    return;
+  }
+
+  courseFiles.innerHTML = visible.map(fileCardHtml).join("");
+  bindPreviewClicks(courseFiles);
+  
+  // 每次重繪課程詳細資訊時，同步更新該課程的聊天室連續對話泡泡！
+  renderChatHistory(course.id);
+}
+
+// 🌟 連續對話 CSS 動態注入（打造 Premium 的聊天室體驗，靠右為 user 泡泡，靠左為 assistant 泡泡）
+const chatStyles = `
+  .chat-thread {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    max-height: 420px;
+    overflow-y: auto;
+    padding: 10px;
+    background: #fafbfc;
+    border-radius: 6px;
+    border: 1px solid var(--line);
+    margin-top: 10px;
+  }
+  .chat-bubble {
+    max-width: 85%;
+    padding: 10px 14px;
+    border-radius: 12px;
+    font-size: 0.92rem;
+    line-height: 1.6;
+    word-break: break-word;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+  }
+  .chat-bubble.user {
+    align-self: flex-end;
+    background: var(--accent);
+    color: #fff;
+    border-bottom-right-radius: 2px;
+  }
+  .chat-bubble.assistant {
+    align-self: flex-start;
+    background: #ffffff;
+    color: var(--ink);
+    border-bottom-left-radius: 2px;
+    border: 1px solid var(--line);
+  }
+  .chat-bubble.loading {
+    align-self: flex-start;
+    background: #f1f4f8;
+    color: var(--muted);
+    font-style: italic;
+    box-shadow: none;
+    border: 1px dashed var(--line);
+  }
+  .chat-bubble.assistant p {
+    margin-top: 0;
+    margin-bottom: 8px;
+  }
+  .chat-bubble.assistant p:last-child {
+    margin-bottom: 0;
+  }
+  .chat-bubble.assistant h1, 
+  .chat-bubble.assistant h2, 
+  .chat-bubble.assistant h3 {
+    margin-top: 12px;
+    margin-bottom: 6px;
+    font-size: 1.05rem;
+    color: var(--ink);
+  }
+  .chat-bubble.assistant ul {
+    margin-top: 0;
+    margin-bottom: 8px;
+    padding-left: 20px;
+  }
+`;
+const styleEl = document.createElement("style");
+styleEl.textContent = chatStyles;
+document.head.appendChild(styleEl);
+
+function renderChatHistory(courseId) {
+  const course = courseById(courseId);
+  if (!course) return;
+
+  const history = state.chatHistories[courseId] || [];
+  const copyBtn = document.querySelector("#copyAnswerButton");
+  
+  if (history.length === 0) {
+    if (copyBtn) copyBtn.style.display = "none";
+    answerBox.innerHTML = `已切換至「${course.title}」。您可以於上方輸入問題並點選「整理」，我將根據本課堂上傳的講義、白板照片 OCR 文字或錄音逐字稿，為您快速梳理重點！`;
+    return;
+  }
+
+  // 渲染整條聊天對話歷史
+  let html = `<div class="chat-thread" id="chatThread">`;
+  history.forEach((msg) => {
+    if (msg.role === "user") {
+      html += `<div class="chat-bubble user">${msg.content}</div>`;
+    } else {
+      if (msg.isLoading) {
+        html += `<div class="chat-bubble assistant loading">💬 AI 正在梳理重點中，請稍候...</div>`;
+      } else {
+        html += `<div class="chat-bubble assistant">${parseMarkdown(msg.content)}</div>`;
+      }
+    }
+  });
+  html += `</div>`;
+  
+  answerBox.innerHTML = html;
+  
+  // 當最後一條是 assistant 回覆且載入完畢時，顯示複製按鈕，並儲存複製內容
+  const lastMsg = history[history.length - 1];
+  if (copyBtn) {
+    if (lastMsg && lastMsg.role === "assistant" && !lastMsg.isLoading) {
+      copyBtn.style.display = "flex";
+      currentAnswerText = lastMsg.content;
+    } else {
+      copyBtn.style.display = "none";
+    }
+  }
+
+  // 自動滾動聊天室到最底部
+  setTimeout(() => {
+    const thread = document.querySelector("#chatThread");
+    if (thread) thread.scrollTop = thread.scrollHeight;
+  }, 50);
+}
+
+function renderStats() {
+  fileCount.textContent = `${state.files.length} files`;
+  matchCount.textContent = `${state.files.filter((file) => file.courseId).length} matched`;
+}
+
+function render() {
+  renderStats();
+  renderSchedule();
+  renderFiles();
+  renderCourseDetail();
+  persistStateSoon();
+}
+
+function loadDemo() {
+  releaseFilePreviews();
+  state.files = demoFiles.map(classifyFile);
+  state.selectedCourseId = "stats";
+  answerBox.textContent = "已載入示範資料。點課表上的課，就能看到被配進那堂課的講義、照片、錄音與筆記。";
+  render();
+}
+
+function summarizeSelectedCourse(question) {
+  const course = courseById(state.selectedCourseId);
+  const files = state.files.filter((file) => file.courseId === course.id);
+  if (!files.length) return `「${course.title}」目前沒有可整理的資料。`;
+
+  const groups = ["document", "image", "audio", "note"].map((type) => {
+    const names = files.filter((file) => file.type === type).map((file) => file.name);
+    return names.length ? `${typeLabel(type)}：${names.join("、")}` : "";
+  }).filter(Boolean);
+
+  return `你問：「${question}」\n\n本機免費 demo 先根據已配對資料整理「${course.title}」：\n${groups.join("\n")}\n\n正式免費版會把照片 OCR、錄音轉文字，再用本機語意搜尋整理重點。`;
+}
+
+async function apiFetch(path, options = {}, retries = 3, delay = 1000) {
+  for (let i = 0; i < retries; i++) {
+    try {
+      const response = await fetch(path, options);
+      const contentType = response.headers.get("content-type") || "";
+      const payload = contentType.includes("application/json") ? await response.json() : await response.text();
+      
+      if (!response.ok) {
+        // 如果遇到暫時性伺服器錯誤（5xx），在重試次數內進行自動重試
+        if (response.status >= 500 && i < retries - 1) {
+          console.warn(`API 返回 ${response.status} 錯誤，正在進行第 ${i + 1} 次自動重試...`);
+          await new Promise(res => setTimeout(res, delay * (i + 1)));
+          continue;
+        }
+        const detail = typeof payload === "string" ? payload : payload.detail || payload.error || payload;
+        throw new Error(typeof detail === "string" ? detail : JSON.stringify(detail));
+      }
+      return payload;
+    } catch (error) {
+      if (i === retries - 1) {
+        throw error;
+      }
+      console.warn(`API 請求連線失敗 (${error.message})，正在進行第 ${i + 1} 次自動重試...`);
+      await new Promise(res => setTimeout(res, delay * (i + 1)));
+    }
+  }
+}
+
+async function checkApiStatus() {
+  try {
+    const status = await apiFetch("/api/status");
+    state.apiReady = Boolean(status.api_ready);
+    apiStatus.textContent = state.apiReady ? "API 已連線" : status.api_key_configured ? `API 異常：${status.auth_status}` : "API 未設定";
+    apiPanelStatus.classList.toggle("is-live", state.apiReady);
+    apiPanelStatus.classList.toggle("is-error", !state.apiReady && Boolean(status.api_key_configured));
+    apiPanelStatus.textContent = state.apiReady
+      ? "API 已連線，可以用 AI 解析課表並同步檔案。"
+      : status.api_key_configured
+        ? `已收到 API key，但檢查未通過：${status.auth_status}`
+        : "後端尚未設定 API key。請在 .env 或部署平台環境變數設定 VAULTSAGE_API_KEY。";
+  } catch {
+    state.apiReady = false;
+    apiStatus.textContent = "請用 server.py 開啟";
+    apiPanelStatus.classList.remove("is-live");
+    apiPanelStatus.classList.add("is-error");
+    apiPanelStatus.textContent = "連不到本機 server，請確認 http://127.0.0.1:4180 有開。";
+  }
+}
+
+async function ensureCourseDirectory(course) {
+  const result = await apiFetch("/api/directories/ensure", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ directory_name: `MochiClass - ${course.title}` }),
+  });
+  return result.directory_id;
+}
+
+async function syncFilesToApi(files) {
+  if (!state.apiReady) {
+    answerBox.textContent = "API 尚未連線。請確認後端 .env 或部署平台環境變數已設定 VAULTSAGE_API_KEY。";
+    return;
+  }
+
+  const realFiles = files.filter((file) => file.courseId && file.sourceFile && !file.vaultFileId);
+  if (!realFiles.length) {
+    answerBox.textContent = "示範檔沒有真實檔案內容可上傳；請拖入你電腦上的實際檔案。";
+    return;
+  }
+
+  answerBox.textContent = `API 主流程：正在依課表建立資料夾並上傳 ${realFiles.length} 份檔案...`;
+  try {
+    const grouped = new Map();
+    for (const file of realFiles) {
+      const list = grouped.get(file.courseId) || [];
+      list.push(file);
+      grouped.set(file.courseId, list);
+    }
+
+    for (const [courseId, courseFiles] of grouped.entries()) {
+      const course = courseById(courseId);
+      const directoryId = await ensureCourseDirectory(course);
+      for (const file of courseFiles) {
+        file.uploadStatus = "uploading";
+        render();
+        
+        let fileToUpload = file.sourceFile;
+        let isFallback = false;
+        
+        // 🌟 核心相容性優化：由於 VaultSage 不支援音訊檔案（如 .wav、.mp3），
+        // 我們會自動將背景識別出的「逐字稿內容」封裝成一個語意豐富的 .md 檔案進行上傳！
+        if (file.type === "audio") {
+          const mdContent = `# 課堂錄音逐字稿大綱\n\n* **原始音訊檔名**: \`${file.name}\`\n* **錄音時間**: ${formatDate(file.lastModified)}\n\n---\n\n### 錄音逐字稿內容：\n${file.sourceText || "（無逐字稿文字）"}`;
+          const mdFilename = file.name.replace(/\.[^/.]+$/, "") + "_錄音逐字稿.md";
+          fileToUpload = new File([mdContent], mdFilename, { type: "text/markdown; charset=utf-8" });
+        } else if (fileToUpload) {
+          // 對於其他真實檔案，我們試圖將其讀入記憶體重新封裝，避免 Chrome 還原 Blob 遺失 Bug
+          try {
+            const buf = await fileToUpload.arrayBuffer();
+            fileToUpload = new File([buf], fileToUpload.name, { type: fileToUpload.type, lastModified: fileToUpload.lastModified });
+          } catch (readErr) {
+            console.warn("實體檔案讀取失敗（可能因本機 C: 碟空間不足導致 Blob 損毀），將自動啟用 AI 文字降級 Fallback 方案！", readErr);
+            isFallback = true;
+          }
+        } else {
+          isFallback = true;
+        }
+
+        // 🌟 空間不足/二進位損毀時的 AI 文字降級傳輸機制！
+        if (isFallback) {
+          if (file.sourceText) {
+            const fileTypeLabel = { image: "白板照片 OCR 文字", document: "講義提取文字", note: "本機筆記內容" }[file.type] || "檔案文字";
+            const mdContent = `# MochiClass 本機文字備援傳輸大綱\n\n* **原始檔名**: \`${file.name}\`\n* **檔案類型**: ${fileTypeLabel}\n* **建立時間**: ${formatDate(file.lastModified)}\n\n---\n\n### 內容大綱：\n${file.sourceText}`;
+            const mdFilename = file.name.replace(/\.[^/.]+$/, "") + "_文字備援.md";
+            fileToUpload = new File([mdContent], mdFilename, { type: "text/markdown; charset=utf-8" });
+            console.log(`成功將已損毀或缺損的檔案 [${file.name}] 降級為 MD 文字檔 [${mdFilename}] 上傳！`);
+          } else {
+            // 如果既損毀又沒有提取出任何文字，我們就上傳一個提示檔，以免整個同步流程卡住崩潰
+            const mdContent = `# MochiClass 損毀檔案提示\n\n* **原始檔名**: \`${file.name}\`\n* **提示**: 該檔案因使用者本機 C: 碟空間嚴重不足（低於 53MB），導致 Chrome 的 IndexedDB 二進位實體 Blob 寫入失敗而損毀，且背景文字識別未完成。`;
+            const mdFilename = file.name.replace(/\.[^/.]+$/, "") + "_無法讀取提示.md";
+            fileToUpload = new File([mdContent], mdFilename, { type: "text/markdown; charset=utf-8" });
+          }
+        }
+        
+        const form = new FormData();
+        form.append("file", fileToUpload);
+        const uploaded = await apiFetch(`/api/upload?directory_id=${encodeURIComponent(directoryId)}`, { method: "POST", body: form });
+        file.vaultFileId = uploaded.file_id;
+        file.uploadStatus = "api";
+      }
+    }
+    answerBox.textContent = "已完成 API 主流程：檔案已依課程資料夾送進 VaultSage。";
+  } catch (error) {
+    answerBox.textContent = `同步失敗：${error.message}`;
+  }
+  render();
+}
+
+async function syncSelectedCourseToApi() {
+  const course = courseById(state.selectedCourseId);
+  const files = state.files.filter((file) => file.courseId === course.id);
+  if (!files.length) {
+    answerBox.textContent = "這堂課目前沒有檔案可以同步。";
+    return;
+  }
+  await syncFilesToApi(files);
+}
+
+document.querySelector("#pickFilesButton").addEventListener("click", () => fileInput.click());
+viewButtons.forEach((button) => {
+  button.addEventListener("click", () => {
+    switchView(button.dataset.view, true);
+    persistStateSoon();
+  });
+});
+checkApiButton.addEventListener("click", () => {
+  checkApiStatus().then(() => {
+    answerBox.textContent = state.apiReady ? "API 已連線。" : "API 尚未連線，請檢查後端環境變數。";
+  });
+});
+document.querySelector("#syncCourseButton").addEventListener("click", () => {
+  syncSelectedCourseToApi().catch((error) => {
+    answerBox.textContent = `同步失敗：${error.message}`;
+  });
+});
+document.querySelector("#downloadMediaButton").addEventListener("click", () => {
+  downloadSelectedCourseMediaZip().catch((error) => {
+    answerBox.textContent = `ZIP 打包失敗：${error.message}`;
+  });
+});
+document.querySelector("#clearButton").addEventListener("click", () => {
+  releaseFilePreviews();
+  state.files = [];
+  answerBox.textContent = "已清空。";
+  render();
+  persistStateSoon();
+});
+
+document.querySelector("#resetAllButton").addEventListener("click", async () => {
+  releaseFilePreviews();
+  state.schedule = defaultSchedule;
+  state.files = [];
+  state.selectedCourseId = defaultSchedule[0].id;
+  state.activeType = "all";
+  activeView = "schedule";
+  scheduleTextInput.value = defaultScheduleText;
+  state.chatHistories = {};
+  state.chatIds = {};
+  localStorage.removeItem(STORAGE_KEY);
+  localStorage.removeItem(SCHEDULE_CACHE_KEY);
+  await clearFileRecords();
+  answerBox.textContent = "已重新開始，課表、檔案與本機快取都已清除。API key 由後端環境變數管理，不會存在前端。";
+  scheduleStatus.textContent = "可直接貼上整段課表，按「AI 解析課表」。";
+  render();
+  switchView("schedule", false);
+  await checkApiStatus();
+});
+
+previewCloseButton.addEventListener("click", closePreview);
+previewModal.querySelector("[data-close-preview]").addEventListener("click", closePreview);
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && previewModal.classList.contains("is-open")) {
+    closePreview();
+  }
+});
+
+fileInput.addEventListener("change", () => {
+  addFiles(fileInput.files).catch((error) => {
+    answerBox.textContent = `加入檔案失敗：${error.message}`;
+  });
+});
+
+const dropZone = document.querySelector("#dropZone");
+dropZone.addEventListener("dragover", (event) => {
+  event.preventDefault();
+  dropZone.classList.add("dragging");
+});
+dropZone.addEventListener("dragleave", () => dropZone.classList.remove("dragging"));
+dropZone.addEventListener("drop", (event) => {
+  event.preventDefault();
+  dropZone.classList.remove("dragging");
+  addFiles(event.dataTransfer.files).catch((error) => {
+    answerBox.textContent = `加入檔案失敗：${error.message}`;
+  });
+});
+
+document.querySelectorAll(".tab").forEach((tab) => {
+  tab.addEventListener("click", () => {
+    document.querySelectorAll(".tab").forEach((item) => item.classList.remove("active"));
+    tab.classList.add("active");
+    state.activeType = tab.dataset.type;
+    renderCourseDetail();
+  });
+});
+
+document.querySelector("#applyScheduleButton").addEventListener("click", applyScheduleText);
+document.querySelector("#localScheduleButton").addEventListener("click", applyLocalScheduleText);
+
+document.querySelector("#askForm").addEventListener("submit", (event) => {
+  event.preventDefault();
+  const input = document.querySelector("#questionInput");
+  const question = input.value.trim();
+  if (!question) return;
+  
+  const course = courseById(state.selectedCourseId);
+  const courseFilesRaw = state.files.filter((file) => file.courseId === course.id);
+  
+  // 問答前做最後防線去重，杜絕發送給 AI 的 Context 出現任何重複檔
+  const courseFiles = [];
+  const seenCourseFileNames = new Set();
+  for (const file of courseFilesRaw) {
+    if (!seenCourseFileNames.has(file.name)) {
+      seenCourseFileNames.add(file.name);
+      courseFiles.push(file);
+    }
+  }
+  const vaultFileIds = courseFiles.filter((file) => file.vaultFileId).map((file) => file.vaultFileId);
+  
+  // 對單一檔案的識別內容/逐字稿進行安全截斷，防止 Token 膨脹
+  const localTexts = courseFiles.filter((file) => file.sourceText).map((file) => {
+    const text = file.sourceText || "";
+    const truncatedText = text.length > 2000
+      ? text.slice(0, 2000) + "\n... (內容過長已安全截斷) ..."
+      : text;
+    return `【${file.name} 的識別內容/逐字稿】：\n${truncatedText}`;
+  });
+  
+  // 1. 初始化連續對話歷史
+  if (!state.chatHistories[course.id]) {
+    state.chatHistories[course.id] = [];
+  }
+  
+  // 2. 將使用者的問題 push 進歷史，並加上 loading 佔位符
+  state.chatHistories[course.id].push({ role: "user", content: question });
+  state.chatHistories[course.id].push({ role: "assistant", content: "", isLoading: true });
+  
+  // 3. 渲染對話，並立刻清空輸入框，方便使用者追問！
+  renderChatHistory(course.id);
+  input.value = "";
+  
+  if (state.apiReady) {
+    let payload = {
+      question: `問題：${question}`,
+      file_ids: vaultFileIds
+    };
+    
+    // 如果存在連續對話 sessionId (chat_id)，在 payload 中帶上，使 AI 自動關聯前文！
+    if (state.chatIds[course.id]) {
+      payload.chat_id = state.chatIds[course.id];
+    }
+    
+    // 對總體 Context 進行 8000 字的安全長度限制，徹底避免 AI 返回空值 EMPTY_AI_OUTPUT
+    let contextStr = localTexts.join("\n\n");
+    if (contextStr.length > 8000) {
+      contextStr = contextStr.slice(0, 8000) + "\n\n... (為維護 AI 回答效能，剩餘資料內容已安全截斷) ...";
+    }
+    
+    // 如果檔案還沒有同步上傳至 VaultSage，我們直接將本機提取的真實 OCR 文字與語音轉文字逐字稿做為 Context 併入 Prompt 傳給 LLM 進行問答！
+    if (localTexts.length && !vaultFileIds.length) {
+      payload.question = `請用繁體中文，根據以下上傳的「${course.title}」課程講義、白板照片 OCR 文字或錄音逐字稿內容，詳細且精確地回答整理使用者的問題。如果資料內容與問題無關，請結合您的學科知識進行回答。\n\n=== 課堂資料內容 ===\n${contextStr}\n\n=== 使用者發問 ===\n問題：${question}`;
+    } else if (localTexts.length && vaultFileIds.length) {
+      // 兩者都有時，結合雙重優勢
+      payload.question = `請用繁體中文回答「${course.title}」的問題。問題：${question}\n\n結合以下補充資料：\n${contextStr}`;
+    } else {
+      payload.question = `請用繁體中文整理或回答「${course.title}」這堂課的問題。問題：${question}`;
+    }
+    
+    apiFetch("/api/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    }).then((result) => {
+      // 儲存最新的 chat_id，讓下一輪問答自動關聯！
+      if (result.chat_id) {
+        state.chatIds[course.id] = result.chat_id;
+      }
+      
+      const history = state.chatHistories[course.id];
+      const loadingMsg = history.find((msg) => msg.role === "assistant" && msg.isLoading);
+      if (loadingMsg) {
+        loadingMsg.content = result.answer || "API 沒有回傳答案。";
+        loadingMsg.isLoading = false;
+      }
+      renderChatHistory(course.id);
+      persistStateSoon();
+    }).catch((error) => {
+      const history = state.chatHistories[course.id];
+      const loadingMsg = history.find((msg) => msg.role === "assistant" && msg.isLoading);
+      if (loadingMsg) {
+        loadingMsg.content = `API 問答失敗，先用本機整理：\n\n${summarizeSelectedCourse(question)}\n\n錯誤：${error.message}`;
+        loadingMsg.isLoading = false;
+      }
+      renderChatHistory(course.id);
+      persistStateSoon();
+    });
+  } else {
+    // API 未連線，落入本機備援 Q&A
+    const history = state.chatHistories[course.id];
+    const loadingMsg = history.find((msg) => msg.role === "assistant" && msg.isLoading);
+    if (loadingMsg) {
+      loadingMsg.content = summarizeSelectedCourse(question);
+      loadingMsg.isLoading = false;
+    }
+    renderChatHistory(course.id);
+    persistStateSoon();
+  }
+});
+
+// 🌟 Markdown 簡易解析器
+function parseMarkdown(text) {
+  if (!text) return "";
+  let html = String(text)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+
+  // Bold **text**
+  html = html.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>");
+
+  // Headers ###, ##, #
+  html = html.replace(/^### (.*?)$/gm, "<h3>$1</h3>");
+  html = html.replace(/^## (.*?)$/gm, "<h2>$1</h2>");
+  html = html.replace(/^# (.*?)$/gm, "<h1>$1</h1>");
+
+  // Bullet lists
+  html = html.replace(/^[-\*] (.*?)$/gm, "<li>$1</li>");
+  
+  // Wrap list items in <ul>
+  html = html.replace(/(<li>.*?<\/li>)/gs, "<ul>$1</ul>");
+  html = html.replace(/<\/ul>\s*<ul>/g, "");
+
+  // Paragraph splits
+  html = html.split(/\n\n+/).map(p => {
+    p = p.trim();
+    if (!p) return "";
+    if (p.startsWith("<h") || p.startsWith("<ul") || p.startsWith("<li")) return p;
+    return `<p>${p.replace(/\n/g, "<br>")}</p>`;
+  }).join("\n");
+
+  return html;
+}
+
+let currentAnswerText = "";
+function showAnswer(text, isMarkdown = true) {
+  currentAnswerText = text;
+  const copyBtn = document.querySelector("#copyAnswerButton");
+  if (!text || !isMarkdown) {
+    if (copyBtn) copyBtn.style.display = "none";
+    answerBox.textContent = text || "";
+  } else {
+    if (copyBtn) copyBtn.style.display = "flex";
+    answerBox.innerHTML = parseMarkdown(text);
+  }
+}
+
+// 複製按鈕事件綁定
+document.querySelector("#copyAnswerButton").addEventListener("click", () => {
+  if (!currentAnswerText) return;
+  navigator.clipboard.writeText(currentAnswerText).then(() => {
+    const btn = document.querySelector("#copyAnswerButton");
+    btn.classList.add("copied");
+    btn.innerHTML = `<span>✓</span> 已複製`;
+    setTimeout(() => {
+      btn.classList.remove("copied");
+      btn.innerHTML = `<span class="copy-icon">📋</span> 複製`;
+    }, 2000);
+  }).catch((err) => {
+    console.error("Clipboard copy failed:", err);
+  });
+});
+
+async function boot() {
+  await restoreState();
+  render();
+  switchView(activeView, false);
+  await checkApiStatus();
+}
+
+boot().catch((error) => {
+  scheduleTextInput.value = defaultScheduleText;
+  answerBox.textContent = `初始化失敗：${error.message}`;
+  render();
+  checkApiStatus();
+});
