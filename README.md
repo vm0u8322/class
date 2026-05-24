@@ -2,6 +2,10 @@
 
 MochiClass 是一個以 **VaultSage API** 為核心的學生課堂檔案整理工具。它打破了傳統筆記軟體先上傳再分類的思維，改以「課表」作為資料管理的入口，幫助學生自動化整理雜亂的課堂影音與文件。
 
+## 線上演示
+
+您可以直接造訪此網址體驗：[MochiClass 線上版本](https://vm0u832-mochiclass.hf.space/)
+
 ## API 用途與核心功能
 
 本專案主要結合 VaultSage API 來達成智慧化的助理功能：
