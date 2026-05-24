@@ -5,7 +5,7 @@ os.environ["FLAGS_use_mkldnn"] = "0"
 import tempfile
 from io import BytesIO
 from pathlib import Path
-from typing import Any, List, Optional
+from typing import Any, List, Optional, Dict
 
 import cv2
 import httpx
@@ -194,7 +194,7 @@ def extract_pdf_text(body: bytes) -> str:
         raise HTTPException(status_code=422, detail=f"PDF text extraction failed: {exc!s}") from exc
 
 
-def vault_headers() -> dict[str, str]:
+def vault_headers() -> Dict[str, str]:
     if not runtime_api_key:
         raise HTTPException(status_code=503, detail="Missing API key")
     return {"X-Api-Key": runtime_api_key}
@@ -218,7 +218,7 @@ def extract_file_id(payload: Any) -> str:
 
 
 @app.get("/api/status")
-def status() -> dict[str, Any]:
+def status() -> Dict[str, Any]:
     result = {
         "api_base": runtime_api_base,
         "api_key_configured": bool(runtime_api_key),
@@ -236,7 +236,7 @@ def status() -> dict[str, Any]:
 
 
 @app.post("/api/config")
-def config(request: ApiConfig) -> dict[str, Any]:
+def config(request: ApiConfig) -> Dict[str, Any]:
     global runtime_api_base, runtime_api_key
     runtime_api_base = request.api_base.rstrip("/")
     if request.api_key:
@@ -245,7 +245,7 @@ def config(request: ApiConfig) -> dict[str, Any]:
 
 
 @app.post("/api/directories/ensure")
-async def ensure_directory(request: EnsureDirectoryRequest) -> dict[str, Any]:
+async def ensure_directory(request: EnsureDirectoryRequest) -> Dict[str, Any]:
     try:
         async with httpx.AsyncClient(timeout=httpx.Timeout(30.0)) as client:
             response = await client.get(f"{runtime_api_base}/directories/", headers=vault_headers())
@@ -275,7 +275,7 @@ async def ensure_directory(request: EnsureDirectoryRequest) -> dict[str, Any]:
 
 
 @app.post("/api/upload")
-async def upload(file: UploadFile = File(...), directory_id: str | None = None) -> dict[str, Any]:
+async def upload(file: UploadFile = File(...), directory_id: Optional[str] = None) -> Dict[str, Any]:
     body = await file.read()
     if not body:
         raise HTTPException(status_code=400, detail="Empty file")
