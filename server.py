@@ -5,7 +5,7 @@ os.environ["FLAGS_use_mkldnn"] = "0"
 import tempfile
 from io import BytesIO
 from pathlib import Path
-from typing import Any
+from typing import Any, List, Optional
 
 import cv2
 import httpx
@@ -72,8 +72,8 @@ class EnsureDirectoryRequest(BaseModel):
 
 class ChatRequest(BaseModel):
     question: str
-    file_ids: list[str] = []
-    chat_id: str | None = None
+    file_ids: List[str] = []
+    chat_id: Optional[str] = None
 
 
 # Models lazy loading
