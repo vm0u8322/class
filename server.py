@@ -386,7 +386,7 @@ def sync_extract_text(body: bytes, filename: str, content_type: str) -> str:
 
 
 @app.post("/api/extract-text")
-async def extract_text(file: UploadFile = File(...)) -> dict[str, Any]:
+async def extract_text(file: UploadFile = File(...)) -> Dict[str, Any]:
     body = await file.read()
     if not body:
         raise HTTPException(status_code=400, detail="Empty file")
@@ -404,12 +404,12 @@ async def extract_text(file: UploadFile = File(...)) -> dict[str, Any]:
 
 
 @app.post("/api/chat")
-async def chat(request: ChatRequest) -> dict[str, Any]:
-    message: dict[str, Any] = {"actor": "user", "content": request.question}
+async def chat(request: ChatRequest) -> Dict[str, Any]:
+    message: Dict[str, Any] = {"actor": "user", "content": request.question}
     if request.file_ids and not request.chat_id:
         message["file_ids"] = request.file_ids
 
-    payload: dict[str, Any] = {"messages": [message], "persist": True}
+    payload: Dict[str, Any] = {"messages": [message], "persist": True}
     if request.chat_id:
         payload["chat_id"] = request.chat_id
 
@@ -435,7 +435,7 @@ async def chat(request: ChatRequest) -> dict[str, Any]:
 
 
 @app.get("/api/sample-docs")
-def sample_docs() -> list[dict[str, Any]]:
+def sample_docs() -> List[Dict[str, Any]]:
     if not SAMPLE_DOCS.exists():
         return []
     docs = []
