@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: mochiclass
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn server:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: VAULTSAGE_API_BASE
+        value: https://api.vaultsage.ai/api/v1
+      - key: VAULTSAGE_API_KEY
+        sync: false

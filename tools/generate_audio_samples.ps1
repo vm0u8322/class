@@ -1,7 +1,7 @@
 $ErrorActionPreference = "Stop"
 Add-Type -AssemblyName System.Speech
 
-$classDir = "E:\MochiClassFree\Class"
+$classDir = "E:\MochiClassFree\example"
 $items = @(
   @{ File = "rec_ax19_q.wav"; Text = "English class sample recording. Today we practice formal email writing, short presentation structure, opening sentences, key points, and a clear closing." },
   @{ File = "rec_db77_l.wav"; Text = "Database systems practice sample recording. This lecture explains ER model, primary key, foreign key, and SQL join queries for students and courses." },

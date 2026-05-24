@@ -1,9 +1,4 @@
-const defaultSchedule = [
-  { id: "stats", day: "一", start: "09:10", end: "12:00", title: "統計學", room: "B302", keywords: ["統計", "stats", "statistics", "anova", "回歸"], sessions: [{ day: "一", start: "09:10", end: "12:00", room: "B302" }] },
-  { id: "ml", day: "二", start: "13:10", end: "16:00", title: "機器學習", room: "A508", keywords: ["機器學習", "ml", "machine", "模型", "分類"], sessions: [{ day: "二", start: "13:10", end: "16:00", room: "A508" }] },
-  { id: "english", day: "三", start: "10:10", end: "12:00", title: "英文簡報", room: "C201", keywords: ["英文", "english", "presentation", "簡報"], sessions: [{ day: "三", start: "10:10", end: "12:00", room: "C201" }] },
-  { id: "network", day: "五", start: "14:10", end: "17:00", title: "網路安全", room: "Lab 3", keywords: ["網路", "資安", "security", "packet", "防火牆"], sessions: [{ day: "五", start: "14:10", end: "17:00", room: "Lab 3" }] },
-];
+const defaultSchedule = [];
 
 const demoFiles = [
   { name: "統計學_ch3_抽樣分配講義.pdf", size: 1480000, lastModified: makeDate("2026-05-18", "10:04") },
@@ -17,7 +12,7 @@ const demoFiles = [
 const state = {
   schedule: defaultSchedule,
   files: [],
-  selectedCourseId: defaultSchedule[0].id,
+  selectedCourseId: null,
   activeType: "all",
   apiReady: false,
   chatHistories: {}, // 每個課程的連續對話歷史
@@ -55,44 +50,7 @@ let dbPromise = null;
 let isRestoring = false;
 let activeView = "schedule";
 
-const defaultScheduleText = `114學年度 第二學期 課表
-
-星期一
-第三節 10:10-11:00｜英文｜王雅涵｜視聽教室(國際樓)
-第四節 11:10-12:00｜英文｜王雅涵｜視聽教室(國際樓)
-第五節 13:30-14:20｜資料庫管理系統實作｜林柏宇｜電703(承曦樓)
-第六節 14:25-15:15｜資料庫管理系統實作｜林柏宇｜電703(承曦樓)
-第七節 15:25-16:15｜資料庫管理系統實作｜林柏宇｜電703(承曦樓)
-
-星期二
-第二節 09:10-10:00｜應用統計學｜陳冠廷｜電707(承曦樓)
-第三節 10:10-11:00｜應用統計學｜陳冠廷｜電707(承曦樓)
-第四節 11:10-12:00｜應用統計學｜陳冠廷｜電707(承曦樓)
-第五節 13:30-14:20｜機器學習與深度學習｜許家豪｜電707(承曦樓)
-第六節 14:25-15:15｜機器學習與深度學習｜許家豪｜電707(承曦樓)
-第七節 15:25-16:15｜機器學習與深度學習｜許家豪｜電707(承曦樓)
-
-星期三
-第一節 08:10-09:00｜智慧工程與近代科技｜張哲維｜承501
-第二節 09:10-10:00｜智慧工程與近代科技｜張哲維｜承501
-第五節 13:30-14:20｜電子商務與網路行銷｜李昱辰｜電708(承曦樓)
-第六節 14:25-15:15｜電子商務與網路行銷｜李昱辰｜電708(承曦樓)
-第七節 15:25-16:15｜電子商務與網路行銷｜李昱辰｜電708(承曦樓)
-
-星期四
-第二節 09:10-10:00｜行動應用開發｜黃子軒｜電401
-第三節 10:10-11:00｜行動應用開發｜黃子軒｜電401
-第四節 11:10-12:00｜行動應用開發｜黃子軒｜電401
-第五節 13:30-14:20｜資訊網路｜周柏翰｜電703(承曦樓)
-第六節 14:25-15:15｜資訊網路｜周柏翰｜電703(承曦樓)
-第七節 15:25-16:15｜資訊網路｜周柏翰｜電703(承曦樓)
-
-星期五
-第二節 09:10-10:00｜Linux系統｜蔡承恩｜電708(承曦樓)
-第三節 10:10-11:00｜Linux系統｜蔡承恩｜電708(承曦樓)
-第四節 11:10-12:00｜Linux系統｜蔡承恩｜電708(承曦樓)
-第五節 13:30-14:20｜資訊管理實務專題二｜吳柏霖｜待排教室
-第六節 14:25-15:15｜資訊管理實務專題二｜吳柏霖｜待排教室`;
+const defaultScheduleText = "";
 
 function makeDate(date, time) {
   return new Date(`${date}T${time}:00+08:00`).getTime();
@@ -224,11 +182,11 @@ async function restoreState() {
       scheduleTextInput.value = defaultScheduleText;
       return;
     }
-    state.schedule = Array.isArray(saved.schedule) && saved.schedule.length ? saved.schedule : defaultSchedule;
+    state.schedule = Array.isArray(saved.schedule) ? saved.schedule : defaultSchedule;
     state.selectedCourseId = saved.selectedCourseId || state.schedule[0]?.id || null;
     state.activeType = saved.activeType || "all";
     activeView = saved.activeView || "schedule";
-    scheduleTextInput.value = saved.scheduleText || defaultScheduleText;
+    scheduleTextInput.value = saved.scheduleText ?? defaultScheduleText;
     state.chatHistories = saved.chatHistories || {};
     state.chatIds = saved.chatIds || {};
 
@@ -803,7 +761,10 @@ async function createZipBlob(entries) {
 
 async function downloadSelectedCourseMediaZip() {
   const course = courseById(state.selectedCourseId);
-  if (!course) return;
+  if (!course) {
+    answerBox.textContent = "請先建立課表並選擇一門課，再下載該課程的照片與錄音。";
+    return;
+  }
   const mediaFiles = state.files.filter((file) => (
     file.courseId === course.id
     && (file.type === "image" || file.type === "audio")
@@ -977,6 +938,11 @@ function typeLabel(type) {
 }
 
 function renderSchedule() {
+  if (!state.schedule.length) {
+    scheduleGrid.innerHTML = `<div class="empty">請先貼上或輸入課表，再按「AI 解析課表」。</div>`;
+    return;
+  }
+
   scheduleGrid.innerHTML = state.schedule.map((course) => {
     const files = state.files.filter((file) => file.courseId === course.id);
     const active = state.selectedCourseId === course.id ? "active" : "";
@@ -1035,7 +1001,12 @@ function renderFiles() {
 
 function renderCourseDetail() {
   const course = courseById(state.selectedCourseId);
-  if (!course) return;
+  if (!course) {
+    courseTitle.textContent = "尚未建立課表";
+    courseMeta.textContent = "貼上課表並解析後，選擇一門課即可查看相關講義、照片與錄音。";
+    courseFiles.innerHTML = `<div class="empty">目前沒有選取課程。</div>`;
+    return;
+  }
 
   const files = state.files.filter((file) => file.courseId === course.id);
   const visible = state.activeType === "all" ? files : files.filter((file) => file.type === state.activeType);
@@ -1346,6 +1317,10 @@ async function syncFilesToApi(files) {
 
 async function syncSelectedCourseToApi() {
   const course = courseById(state.selectedCourseId);
+  if (!course) {
+    answerBox.textContent = "請先建立課表並選擇一門課，再同步到 API。";
+    return;
+  }
   const files = state.files.filter((file) => file.courseId === course.id);
   if (!files.length) {
     answerBox.textContent = "這堂課目前沒有檔案可以同步。";
@@ -1388,7 +1363,7 @@ document.querySelector("#resetAllButton").addEventListener("click", async () => 
   releaseFilePreviews();
   state.schedule = defaultSchedule;
   state.files = [];
-  state.selectedCourseId = defaultSchedule[0].id;
+  state.selectedCourseId = null;
   state.activeType = "all";
   activeView = "schedule";
   scheduleTextInput.value = defaultScheduleText;
@@ -1442,8 +1417,6 @@ document.querySelectorAll(".tab").forEach((tab) => {
 });
 
 document.querySelector("#applyScheduleButton").addEventListener("click", applyScheduleText);
-document.querySelector("#localScheduleButton").addEventListener("click", applyLocalScheduleText);
-
 document.querySelector("#askForm").addEventListener("submit", (event) => {
   event.preventDefault();
   const input = document.querySelector("#questionInput");
@@ -1451,6 +1424,10 @@ document.querySelector("#askForm").addEventListener("submit", (event) => {
   if (!question) return;
   
   const course = courseById(state.selectedCourseId);
+  if (!course) {
+    answerBox.textContent = "請先貼上課表並解析，選擇一門課後再開始問答。";
+    return;
+  }
   const courseFilesRaw = state.files.filter((file) => file.courseId === course.id);
   
   // 問答前做最後防線去重，杜絕發送給 AI 的 Context 出現任何重複檔

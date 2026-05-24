@@ -7,7 +7,7 @@ from reportlab.pdfgen import canvas
 
 
 ROOT = Path(__file__).resolve().parents[1]
-CLASS_DIR = ROOT / "Class"
+CLASS_DIR = ROOT / "example"
 FONT_NAME = "MSung-Light"
 
 

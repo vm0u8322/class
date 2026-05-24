@@ -54,7 +54,7 @@ http://127.0.0.1:4180
 範例資料放在：
 
 ```text
-E:\MochiClassFree\Class
+E:\MochiClassFree\example
 ```
 
 裡面包含：
@@ -86,3 +86,21 @@ E:\MochiClassFree\Class
 - 本機問答摘要：先用抽取式摘要 + 關鍵句；有顯卡再接小型 GGUF LLM
 
 建議比賽 demo 先把「課表入口 + 自動配課 + 多素材集中 + 未配對檔案整理」做穩，模型用可插拔方式展示即可。這樣定位會偏檔案管理，不是 NotebookLM 類問答工具。
+
+## Render ????
+
+Render ?????
+
+```text
+Build Command: pip install -r requirements.txt
+Start Command: uvicorn server:app --host 0.0.0.0 --port $PORT
+```
+
+?????? Render Dashboard ??????? GitHub?
+
+```text
+VAULTSAGE_API_BASE=https://api.vaultsage.ai/api/v1
+VAULTSAGE_API_KEY=?? API key
+```
+
+????? `runtime.txt` ?? Python 3.11.9??? Render ??????????

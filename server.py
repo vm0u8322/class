@@ -22,7 +22,7 @@ from pypdf import PdfReader
 
 
 ROOT = Path(__file__).resolve().parent
-SAMPLE_DOCS = ROOT / "Class"
+SAMPLE_DOCS = ROOT / "example"
 PDF_HINTS = {
     "axq_0197_lmn.pdf": "英文講義。內容包含 Email writing、short presentation、formal email opening、presentation structure，授課教師王雅涵。",
     "bravo_77xq.pdf": "資料庫管理系統實作講義。內容包含 ER Model、資料表設計、Primary Key、Foreign Key、SQL JOIN、選課系統資料庫。",
