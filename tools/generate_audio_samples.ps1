@@ -24,3 +24,5 @@ foreach ($item in $items) {
   $synth.Speak($item.Text)
   $synth.Dispose()
 }
+
+& (Join-Path $PSScriptRoot "restore_example_timestamps.ps1")
