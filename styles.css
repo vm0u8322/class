@@ -655,8 +655,8 @@ h2 {
     flex-direction: column;
   }
 
-  #previewImage {
-    max-height: calc(100vh - 130px);
+  .view-button[data-view="course"] {
+    display: block !important;
   }
 }
 
