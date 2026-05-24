@@ -601,13 +601,12 @@ h2 {
     width: 100%;
   }
 
-  .app-view:not(.right-panel) {
-    display: none;
+  .app-view {
+    display: none !important;
   }
 
-  .app-view.active,
-  .right-panel {
-    display: block;
+  .app-view.active {
+    display: block !important;
   }
 
   .view-switcher {
@@ -615,19 +614,16 @@ h2 {
     top: 0;
     z-index: 10;
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: 1fr 1fr 1fr;
     gap: 6px;
     padding-bottom: 10px;
-  }
-
-  .view-button[data-view="course"] {
-    display: none;
   }
 
   .view-button {
     min-height: 40px;
     padding: 8px 6px;
     white-space: normal;
+    font-size: 0.85rem;
   }
 
   .schedule-grid,
