@@ -1,13 +1,12 @@
-FROM python:3.10-slim
+FROM python:3.10
 
-# 安裝 OpenCV 與本機 OCR 所需的系統依賴庫
+# 安裝 OpenCV 與圖形庫所需的底層系統依賴
 RUN apt-get update && apt-get install -y \
-    build-essential \
     libgl1-mesa-glx \
     libglib2.0-0 \
     && rm -rf /var/lib/apt/lists/*
 
-# 創建一個 UID 為 1000 的非 root 使用者（Hugging Face 安全規範）
+# 建立 UID 1000 的安全使用者（Hugging Face 規範）
 RUN useradd -m -u 1000 user
 USER user
 ENV HOME=/home/user \
@@ -15,12 +14,12 @@ ENV HOME=/home/user \
 
 WORKDIR $HOME/app
 
-# 複製並安裝 Python 依賴
+# 複製依賴清單並安裝
 COPY --chown=user requirements.txt $HOME/app/requirements.txt
 RUN pip install --no-cache-dir --upgrade -r requirements.txt
 
-# 複製其餘專案檔案
+# 複製專案其餘檔案
 COPY --chown=user . $HOME/app
 
-# Hugging Face Spaces 預設必須監聽 7860 連接埠
+# 監聽 Hugging Face Spaces 要求的 7860 連接埠
 CMD ["uvicorn", "server:app", "--host", "0.0.0.0", "--port", "7860"]

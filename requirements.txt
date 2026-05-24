@@ -5,9 +5,9 @@ python-dotenv==1.0.1
 python-multipart==0.0.20
 pypdf==5.1.0
 pypdfium2==5.8.0
-Pillow==12.2.0
-numpy==2.3.5
-opencv-python-headless==4.13.0.92
-paddlepaddle==3.3.1
-paddleocr==3.5.0
-faster-whisper==1.2.1
+Pillow==10.3.0
+numpy==1.26.4
+opencv-python-headless==4.9.0.80
+paddlepaddle==2.6.1
+paddleocr==2.8.1
+faster-whisper==1.0.3
