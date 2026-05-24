@@ -8,6 +8,3 @@ pypdfium2==5.8.0
 Pillow==10.3.0
 numpy==1.26.4
 opencv-python-headless==4.9.0.80
-paddlepaddle==2.6.1
-paddleocr==2.8.1
-faster-whisper==1.0.3

@@ -14,11 +14,16 @@ ENV HOME=/home/user \
 
 WORKDIR $HOME/app
 
-# 複製依賴清單並安裝
+# 1. 先複製基本依賴清單並安裝
 COPY --chown=user requirements.txt $HOME/app/requirements.txt
 RUN pip install --no-cache-dir --upgrade -r requirements.txt
 
-# 複製專案其餘檔案
+# 2. 分段安裝大型機器學習庫，降低 pip 解析與解壓時的記憶體峰值（避免 OOM Crash）
+RUN pip install --no-cache-dir paddlepaddle==2.6.1
+RUN pip install --no-cache-dir paddleocr==2.8.1
+RUN pip install --no-cache-dir faster-whisper==1.0.3
+
+# 3. 複製專案其餘檔案
 COPY --chown=user . $HOME/app
 
 # 監聽 Hugging Face Spaces 要求的 7860 連接埠
