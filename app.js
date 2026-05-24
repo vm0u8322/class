@@ -949,7 +949,8 @@ function courseProgress(files) {
   if (!files.length) {
     return { total: 0, done: 0, percent: 0, label: "尚未上傳資料", state: "empty" };
   }
-  const doneStatuses = new Set(["local", "api", "failed"]);
+  // 核心邏輯優化：將 "uploading" 也視為辨識完成，避免進度條因進入上傳階段而往回跳 (regression)
+  const doneStatuses = new Set(["local", "uploading", "api", "failed"]);
   const done = files.filter((file) => doneStatuses.has(file.uploadStatus)).length;
   const percent = Math.round((done / files.length) * 100);
   const hasWorking = files.some((file) => ["pending", "processing", "uploading"].includes(file.uploadStatus));

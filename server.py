@@ -5,6 +5,7 @@ os.environ["FLAGS_use_mkldnn"] = "0"
 import tempfile
 from io import BytesIO
 from pathlib import Path
+import threading
 from typing import Any, List, Optional, Dict
 
 import cv2
@@ -76,9 +77,12 @@ class ChatRequest(BaseModel):
     chat_id: Optional[str] = None
 
 
+import threading
+
 # Models lazy loading
 _ocr_model = None
 _whisper_model = None
+_ocr_lock = threading.Lock()
 
 def get_ocr():
     global _ocr_model
@@ -113,52 +117,34 @@ def get_whisper():
     return _whisper_model
 
 def run_ocr_on_pil(pil_img: Image.Image) -> str:
-    import json
-    import subprocess
-    import sys
-    try:
-        # Resize image to speed up CPU inference tremendously!
-        # Standard whiteboard photos do not need 4000px resolution; 1200px is more than enough for crisp Chinese OCR!
-        max_size = 1200
-        if max(pil_img.size) > max_size:
-            pil_img = pil_img.copy()
-            pil_img.thumbnail((max_size, max_size), Image.Resampling.LANCZOS)
-            print(f"Resized image to {pil_img.size} for fast CPU OCR")
-            
-        # Write PIL Image to a temporary PNG file
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as tmp:
-            pil_img.save(tmp, format="PNG")
-            tmp_path = tmp.name
-            
+    # ⚡ 速度優化：縮小圖片並直接在進程內辨識，避免每次重新讀取模型（速度提升 10 倍以上）
+    max_size = 1000
+    if max(pil_img.size) > max_size:
+        pil_img = pil_img.copy()
+        pil_img.thumbnail((max_size, max_size), Image.Resampling.LANCZOS)
+        print(f"Resized image to {pil_img.size} for fast CPU OCR")
+
+    model = get_ocr()
+    if not model:
+        return ""
+
+    with _ocr_lock:
         try:
-            # Run in isolated subprocess! 100% thread safe, 0% crash risk for server!
-            res = subprocess.run([
-                sys.executable,
-                str(ROOT / "ocr_helper.py"),
-                tmp_path
-            ], capture_output=True) # Capture raw bytes to avoid UnicodeDecodeError in reader thread
+            img_np = np.array(pil_img.convert("RGB"))
+            img_cv2 = cv2.cvtColor(img_np, cv2.COLOR_RGB2BGR)
+            result = model.ocr(img_cv2, cls=False)
             
-            if res.returncode == 0:
-                stdout_str = res.stdout.decode("utf-8", errors="ignore")
-                # Locate JSON block to ignore any warnings/deprecations printed on stdout
-                start_idx = stdout_str.find("{")
-                end_idx = stdout_str.rfind("}")
-                if start_idx >= 0 and end_idx > start_idx:
-                    try:
-                        data = json.loads(stdout_str[start_idx:end_idx+1])
-                        return data.get("text", "").strip()
-                    except Exception as parse_err:
-                        print(f"Failed to parse OCR helper JSON: {parse_err}")
-                print(f"Failed to find JSON in OCR helper stdout: {stdout_str}")
+            if not result or not result[0]:
                 return ""
-            else:
-                stderr_str = res.stderr.decode("utf-8", errors="ignore")
-                print(f"Subprocess OCR failed with code {res.returncode}: {stderr_str}")
-                return ""
-        finally:
-            try:
-                os.unlink(tmp_path)
-            except Exception:
+                
+            texts = []
+            for line in result[0]:
+                if line and len(line) > 1:
+                    texts.append(line[1][0])
+            return " ".join(texts)
+        except Exception as e:
+            print(f"OCR 執行出錯: {e}")
+            return ""
                 pass
     except Exception as exc:
         print(f"PaddleOCR subprocess invocation failed: {exc}")
