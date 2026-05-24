@@ -41,6 +41,12 @@ VaultSage API 在本作品中負責：
 
 這個定位和 NotebookLM 不完全相同。NotebookLM 偏向「對一批資料問答」，MochiClass 則偏向「學生課堂資料管理」：先幫學生把資料按課表整理好，再針對每一門課查找、預覽、下載與整理重點。
 
+## 成功畫面
+
+下圖展示系統成功解析課表、配對 39 份檔案、連線 VaultSage API，並根據課堂照片整理重點的畫面。
+
+![MochiClass 成功畫面](docs/success-screen.png)
+
 ## 使用流程
 
 1. 開啟網站。
@@ -96,23 +102,25 @@ VAULTSAGE_API_KEY=your_api_key_here
 
 `.env` 不應該提交到 GitHub。
 
-## Render 部署
+## Hugging Face Spaces 部署
 
-Render 設定：
+本專案可使用 Hugging Face Spaces 的 Docker 模式部署。
+
+建立 Space 時請選：
 
 ```text
-Build Command: pip install -r requirements.txt
-Start Command: uvicorn server:app --host 0.0.0.0 --port $PORT
+SDK: Docker
+Visibility: Public
 ```
 
-環境變數請在 Render Dashboard 設定，不要寫進 GitHub：
+部署後請到 Space 的 Settings > Repository secrets 設定：
 
 ```text
 VAULTSAGE_API_BASE=https://api.vaultsage.ai/api/v1
 VAULTSAGE_API_KEY=your_api_key_here
 ```
 
-專案已使用 `runtime.txt` 指定 Python 3.11.9，避免部署時因 Python 版本不同造成套件安裝失敗。
+API key 不要寫進程式碼或 GitHub。Hugging Face 會從 Secrets 注入環境變數，後端再用這些環境變數呼叫 VaultSage API。
 
 ## 評審測試建議
 
@@ -124,9 +132,3 @@ VAULTSAGE_API_KEY=your_api_key_here
 6. 點擊照片確認可預覽。
 7. 輸入「這堂課重點是什麼？」測試課程問答。
 8. 按下載確認該課程的圖片與錄音可以打包成 ZIP。
-
-## 是否需要重新部署
-
-如果只修改 README，不需要重新部署。README 只影響 GitHub 頁面的說明文件，不會改變 Render 上執行中的網站功能。
-
-只有修改前端、後端、設定檔、requirements 或環境變數時，才需要重新部署。

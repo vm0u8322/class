@@ -9,9 +9,24 @@ import cv2
 from PIL import Image
 import numpy as np
 
+try:
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+except Exception:
+    pass
+
+
+def emit(payload):
+    text = json.dumps(payload, ensure_ascii=False)
+    try:
+        print(text)
+    except UnicodeEncodeError:
+        sys.stdout.buffer.write(text.encode("utf-8", errors="replace") + b"\n")
+        sys.stdout.flush()
+
 def main():
     if len(sys.argv) < 2:
-        print(json.dumps({"text": "", "error": "No image path provided"}))
+        emit({"text": "", "error": "No image path provided"})
         return
         
     image_path = sys.argv[1]
@@ -44,9 +59,9 @@ def main():
                 if texts:
                     lines.extend(texts)
         
-        print(json.dumps({"text": " ".join(lines).strip()}, ensure_ascii=False))
+        emit({"text": " ".join(lines).strip()})
     except Exception as exc:
-        print(json.dumps({"text": "", "error": str(exc)}, ensure_ascii=False))
+        emit({"text": "", "error": str(exc)})
 
 if __name__ == "__main__":
     main()

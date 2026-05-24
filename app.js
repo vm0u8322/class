@@ -31,6 +31,7 @@ const scheduleTextInput = document.querySelector("#scheduleTextInput");
 const scheduleStatus = document.querySelector("#scheduleStatus");
 const answerBox = document.querySelector("#answerBox");
 const apiStatus = document.querySelector("#apiStatus");
+const workStatus = document.querySelector("#workStatus");
 const apiPanelStatus = document.querySelector("#apiPanelStatus");
 const checkApiButton = document.querySelector("#checkApiButton");
 const previewModal = document.querySelector("#previewModal");
@@ -558,11 +559,14 @@ function scoreFileForCourse(file, course) {
       && minute <= minutesOfDay(session.end) + 20
     ));
     if (inWindowSession) {
-      score += 3;
-      reasons.push(`拍攝/建立時間落在 ${inWindowSession.day} ${inWindowSession.start}-${inWindowSession.end}`);
+      const timeScore = file.type === "audio" ? 10 : 3;
+      score += timeScore;
+      const timeLabel = file.type === "audio" ? "錄音時間" : "拍攝/建立時間";
+      reasons.push(`${timeLabel}落在 ${inWindowSession.day} ${inWindowSession.start}-${inWindowSession.end}`);
     } else if (sameDaySession) {
-      score += 1;
-      reasons.push("同一天建立");
+      const sameDayScore = file.type === "audio" ? 2 : 1;
+      score += sameDayScore;
+      reasons.push(file.type === "audio" ? "錄音日期與課程同一天" : "同一天建立");
     }
   }
 
@@ -580,10 +584,14 @@ function courseOptionsForAi() {
 }
 
 async function classifyTextFilesByApi(files) {
-  const targets = files.filter((file) => file.sourceText && !file.vaultFileId);
+  const targets = files.filter((file) => (
+    file.sourceText
+    && !file.vaultFileId
+    && !(file.type === "audio" && file.courseId && file.confidence >= 90)
+  ));
   if (!targets.length) return;
 
-  answerBox.textContent = `正在用 API 讀取 ${targets.length} 份文字講義內容並判斷科目...`;
+  showBackgroundStatus(`正在用 API 讀取 ${targets.length} 份文字講義內容並判斷科目...`);
   for (const file of targets) {
     const excerpt = file.sourceText.slice(0, 2600);
     const result = await apiFetch("/api/chat", {
@@ -846,7 +854,7 @@ async function addFiles(files) {
   render();
   switchView("files", true);
   
-  answerBox.textContent = `已加入 ${newFiles.length} 個檔案，正在背景排隊進行文字辨識與 AI 分析...`;
+  showBackgroundStatus(`已加入 ${newFiles.length} 個檔案，正在背景排隊進行文字辨識與 AI 分析...`);
 
   // 2. 逐一在背景處理每個檔案，使介面保持完美響應，不卡死！
   for (const file of newFiles) {
@@ -897,7 +905,7 @@ async function addFiles(files) {
     }
   }
 
-  answerBox.textContent = `佇列中的 ${newFiles.length} 個檔案已全部完成背景分析與同步！`;
+  showBackgroundStatus(`佇列中的 ${newFiles.length} 個檔案已全部完成背景分析與同步！`);
 }
 
 async function loadSampleCourseDocs() {
@@ -937,6 +945,26 @@ function typeLabel(type) {
   }[type] || "檔案";
 }
 
+function courseProgress(files) {
+  if (!files.length) {
+    return { total: 0, done: 0, percent: 0, label: "尚未上傳資料", state: "empty" };
+  }
+  const doneStatuses = new Set(["local", "api", "failed"]);
+  const done = files.filter((file) => doneStatuses.has(file.uploadStatus)).length;
+  const percent = Math.round((done / files.length) * 100);
+  const hasWorking = files.some((file) => ["pending", "processing", "uploading"].includes(file.uploadStatus));
+  const label = hasWorking
+    ? `辨識進度 ${done}/${files.length}`
+    : `辨識完成 ${done}/${files.length}`;
+  return {
+    total: files.length,
+    done,
+    percent,
+    label,
+    state: hasWorking ? "working" : "done",
+  };
+}
+
 function renderSchedule() {
   if (!state.schedule.length) {
     scheduleGrid.innerHTML = `<div class="empty">請先貼上或輸入課表，再按「AI 解析課表」。</div>`;
@@ -945,6 +973,7 @@ function renderSchedule() {
 
   scheduleGrid.innerHTML = state.schedule.map((course) => {
     const files = state.files.filter((file) => file.courseId === course.id);
+    const progress = courseProgress(files);
     const active = state.selectedCourseId === course.id ? "active" : "";
     return `
       <article class="course-slot ${active}" data-course="${course.id}">
@@ -955,6 +984,15 @@ function renderSchedule() {
           <span class="badge">照片 ${files.filter((f) => f.type === "image").length}</span>
           <span class="badge">錄音 ${files.filter((f) => f.type === "audio").length}</span>
           <span class="badge">筆記 ${files.filter((f) => f.type === "note").length}</span>
+        </div>
+        <div class="course-progress is-${progress.state}" aria-label="${progress.label}">
+          <div class="course-progress-meta">
+            <span>${progress.label}</span>
+            <span>${progress.percent}%</span>
+          </div>
+          <div class="course-progress-track">
+            <div class="course-progress-fill" style="width:${progress.percent}%"></div>
+          </div>
         </div>
       </article>
     `;
@@ -973,7 +1011,6 @@ function renderSchedule() {
       }
       
       render();
-      switchView("course", true);
     });
   });
 }
@@ -1015,15 +1052,11 @@ function renderCourseDetail() {
 
   if (!visible.length) {
     courseFiles.innerHTML = `<div class="empty">這個分類目前沒有資料。</div>`;
-    renderChatHistory(course.id);
     return;
   }
 
   courseFiles.innerHTML = visible.map(fileCardHtml).join("");
   bindPreviewClicks(courseFiles);
-  
-  // 每次重繪課程詳細資訊時，同步更新該課程的聊天室連續對話泡泡！
-  renderChatHistory(course.id);
 }
 
 // 🌟 連續對話 CSS 動態注入（打造 Premium 的聊天室體驗，靠右為 user 泡泡，靠左為 assistant 泡泡）
@@ -1115,7 +1148,7 @@ function renderChatHistory(courseId) {
       html += `<div class="chat-bubble user">${msg.content}</div>`;
     } else {
       if (msg.isLoading) {
-        html += `<div class="chat-bubble assistant loading">💬 AI 正在梳理重點中，請稍候...</div>`;
+        html += `<div class="chat-bubble assistant loading">${msg.content || "正在辨識圖片與整理課堂內容，請稍候..."}</div>`;
       } else {
         html += `<div class="chat-bubble assistant">${parseMarkdown(msg.content)}</div>`;
       }
@@ -1169,12 +1202,64 @@ function summarizeSelectedCourse(question) {
   const files = state.files.filter((file) => file.courseId === course.id);
   if (!files.length) return `「${course.title}」目前沒有可整理的資料。`;
 
+  const textFiles = files.filter((file) => file.sourceText);
+  const images = files.filter((file) => file.type === "image");
+  if (textFiles.length) {
+    const excerpts = textFiles.map((file) => {
+      const text = String(file.sourceText || "").trim();
+      const excerpt = text.length > 700 ? `${text.slice(0, 700)}...` : text;
+      return `【${file.name}】\n${excerpt}`;
+    }).join("\n\n");
+    const missingImages = images.filter((file) => !file.sourceText).map((file) => file.name);
+    const missingNote = missingImages.length
+      ? `\n\n以下圖片目前沒有 OCR 文字，不能假裝有讀到：\n${missingImages.map((name) => `- ${name}`).join("\n")}`
+      : "";
+    return `你問：「${question}」\n\n以下只根據目前已辨識出的課堂檔案內容整理「${course.title}」：\n\n${excerpts}${missingNote}`;
+  }
+
   const groups = ["document", "image", "audio", "note"].map((type) => {
     const names = files.filter((file) => file.type === type).map((file) => file.name);
     return names.length ? `${typeLabel(type)}：${names.join("、")}` : "";
   }).filter(Boolean);
 
-  return `你問：「${question}」\n\n本機免費 demo 先根據已配對資料整理「${course.title}」：\n${groups.join("\n")}\n\n正式免費版會把照片 OCR、錄音轉文字，再用本機語意搜尋整理重點。`;
+  return `你問：「${question}」\n\n「${course.title}」目前有配對檔案，但沒有可用的 OCR 文字或逐字稿，所以不能根據圖片內容回答。\n${groups.join("\n")}\n\n請重新上傳檔案，或確認後端 OCR 服務已正常啟動。`;
+}
+
+async function ensureCourseFileText(courseFiles, courseId) {
+  const needsText = courseFiles.filter((file) => (
+    file.sourceFile
+    && !file.sourceText
+    && ["image", "document", "audio", "note"].includes(file.type)
+  ));
+  if (!needsText.length) return;
+
+  const history = state.chatHistories[courseId] || [];
+  const loadingMsg = history.find((msg) => msg.role === "assistant" && msg.isLoading);
+  if (loadingMsg) {
+    loadingMsg.content = `正在重新辨識這堂課 ${needsText.length} 個尚未讀到內容的檔案...`;
+    renderChatHistory(courseId);
+  }
+  for (const file of needsText) {
+    try {
+      if (loadingMsg) {
+        loadingMsg.content = `正在辨識 ${file.name}...`;
+        renderChatHistory(courseId);
+      }
+      file.uploadStatus = "processing";
+      renderSchedule();
+      renderFiles();
+      renderCourseDetail();
+      await enrichFileLike(file.sourceFile);
+      file.sourceText = file.sourceFile.sourceText || "";
+      file.uploadStatus = file.sourceText ? "local" : "pending";
+      renderSchedule();
+    } catch (error) {
+      console.warn("Re-OCR failed:", file.name, error);
+      file.uploadStatus = "pending";
+    }
+  }
+  render();
+  persistStateSoon();
 }
 
 async function apiFetch(path, options = {}, retries = 3, delay = 1000) {
@@ -1247,7 +1332,7 @@ async function syncFilesToApi(files) {
     return;
   }
 
-  answerBox.textContent = `API 主流程：正在依課表建立資料夾並上傳 ${realFiles.length} 份檔案...`;
+  showBackgroundStatus(`API 主流程：正在依課表建立資料夾並上傳 ${realFiles.length} 份檔案...`);
   try {
     const grouped = new Map();
     for (const file of realFiles) {
@@ -1308,9 +1393,9 @@ async function syncFilesToApi(files) {
         file.uploadStatus = "api";
       }
     }
-    answerBox.textContent = "已完成 API 主流程：檔案已依課程資料夾送進 VaultSage。";
+    showBackgroundStatus("已完成 API 主流程：檔案已依課程資料夾送進 VaultSage。");
   } catch (error) {
-    answerBox.textContent = `同步失敗：${error.message}`;
+    showBackgroundStatus(`同步失敗：${error.message}`);
   }
   render();
 }
@@ -1417,7 +1502,7 @@ document.querySelectorAll(".tab").forEach((tab) => {
 });
 
 document.querySelector("#applyScheduleButton").addEventListener("click", applyScheduleText);
-document.querySelector("#askForm").addEventListener("submit", (event) => {
+document.querySelector("#askForm").addEventListener("submit", async (event) => {
   event.preventDefault();
   const input = document.querySelector("#questionInput");
   const question = input.value.trim();
@@ -1439,6 +1524,16 @@ document.querySelector("#askForm").addEventListener("submit", (event) => {
       courseFiles.push(file);
     }
   }
+
+  if (!state.chatHistories[course.id]) {
+    state.chatHistories[course.id] = [];
+  }
+  state.chatHistories[course.id].push({ role: "user", content: question });
+  state.chatHistories[course.id].push({ role: "assistant", content: "正在檢查這堂課的圖片 OCR 與檔案內容，請稍候...", isLoading: true });
+  renderChatHistory(course.id);
+  input.value = "";
+
+  await ensureCourseFileText(courseFiles, course.id);
   const vaultFileIds = courseFiles.filter((file) => file.vaultFileId).map((file) => file.vaultFileId);
   
   // 對單一檔案的識別內容/逐字稿進行安全截斷，防止 Token 膨脹
@@ -1449,19 +1544,9 @@ document.querySelector("#askForm").addEventListener("submit", (event) => {
       : text;
     return `【${file.name} 的識別內容/逐字稿】：\n${truncatedText}`;
   });
-  
-  // 1. 初始化連續對話歷史
-  if (!state.chatHistories[course.id]) {
-    state.chatHistories[course.id] = [];
-  }
-  
-  // 2. 將使用者的問題 push 進歷史，並加上 loading 佔位符
-  state.chatHistories[course.id].push({ role: "user", content: question });
-  state.chatHistories[course.id].push({ role: "assistant", content: "", isLoading: true });
-  
-  // 3. 渲染對話，並立刻清空輸入框，方便使用者追問！
-  renderChatHistory(course.id);
-  input.value = "";
+  const filesWithoutText = courseFiles
+    .filter((file) => file.type === "image" && !file.sourceText)
+    .map((file) => file.name);
   
   if (state.apiReady) {
     let payload = {
@@ -1475,19 +1560,27 @@ document.querySelector("#askForm").addEventListener("submit", (event) => {
     }
     
     // 對總體 Context 進行 8000 字的安全長度限制，徹底避免 AI 返回空值 EMPTY_AI_OUTPUT
-    let contextStr = localTexts.join("\n\n");
+    const missingTextBlock = filesWithoutText.length
+      ? `【尚未取得 OCR 文字的圖片，不能推測內容】：\n${filesWithoutText.map((name) => `- ${name}`).join("\n")}`
+      : "";
+    let contextStr = [...localTexts, missingTextBlock].filter(Boolean).join("\n\n");
     if (contextStr.length > 8000) {
       contextStr = contextStr.slice(0, 8000) + "\n\n... (為維護 AI 回答效能，剩餘資料內容已安全截斷) ...";
     }
     
+    const strictGroundingRule = `回答規則：
+1. 只能根據下方提供的課堂資料內容、OCR 文字、逐字稿或已上傳檔案回答。
+2. 不可以自行補充沒有出現在資料中的內容，也不可以用一般學科知識瞎猜。
+3. 如果資料不足、OCR 沒有辨識到、或問題要求的內容不在資料內，請直接說「目前資料不足，無法根據上傳檔案判斷」。
+4. 回答時請簡短說明你依據了哪些檔案。`;
+
     // 如果檔案還沒有同步上傳至 VaultSage，我們直接將本機提取的真實 OCR 文字與語音轉文字逐字稿做為 Context 併入 Prompt 傳給 LLM 進行問答！
-    if (localTexts.length && !vaultFileIds.length) {
-      payload.question = `請用繁體中文，根據以下上傳的「${course.title}」課程講義、白板照片 OCR 文字或錄音逐字稿內容，詳細且精確地回答整理使用者的問題。如果資料內容與問題無關，請結合您的學科知識進行回答。\n\n=== 課堂資料內容 ===\n${contextStr}\n\n=== 使用者發問 ===\n問題：${question}`;
-    } else if (localTexts.length && vaultFileIds.length) {
-      // 兩者都有時，結合雙重優勢
-      payload.question = `請用繁體中文回答「${course.title}」的問題。問題：${question}\n\n結合以下補充資料：\n${contextStr}`;
+    if (contextStr && !vaultFileIds.length) {
+      payload.question = `請用繁體中文回答「${course.title}」這堂課的問題。\n\n${strictGroundingRule}\n\n=== 課堂資料內容 ===\n${contextStr}\n\n=== 使用者發問 ===\n問題：${question}`;
+    } else if (contextStr && vaultFileIds.length) {
+      payload.question = `請用繁體中文回答「${course.title}」這堂課的問題。\n\n${strictGroundingRule}\n\n=== 本機已辨識出的課堂資料內容 ===\n${contextStr}\n\n=== 使用者發問 ===\n問題：${question}`;
     } else {
-      payload.question = `請用繁體中文整理或回答「${course.title}」這堂課的問題。問題：${question}`;
+      payload.question = `請用繁體中文回答「${course.title}」這堂課的問題。\n\n${strictGroundingRule}\n\n目前前端沒有可用的 OCR 文字或逐字稿，只能依據已上傳到 VaultSage 的檔案檢索結果回答。若檢索不到明確內容，請回答資料不足。\n\n問題：${question}`;
     }
     
     apiFetch("/api/chat", {
@@ -1578,6 +1671,12 @@ function showAnswer(text, isMarkdown = true) {
   }
 }
 
+function showBackgroundStatus(text) {
+  if (workStatus) {
+    workStatus.textContent = text;
+  }
+}
+
 // 複製按鈕事件綁定
 document.querySelector("#copyAnswerButton").addEventListener("click", () => {
   if (!currentAnswerText) return;
@@ -1607,3 +1706,4 @@ boot().catch((error) => {
   render();
   checkApiStatus();
 });
+
