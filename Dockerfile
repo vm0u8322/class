@@ -1,11 +1,13 @@
 FROM python:3.9
 
 # 安裝 OpenCV 與圖形庫所需的底層系統依賴
-# 包含編譯 PaddleOCR 依賴項（如 shapely, pyclipper）所需的建置工具
+# 包含編譯 PaddleOCR 依賴項 (如 lanms-neo, shapely) 所需的 swig 與建置工具
 RUN apt-get update && apt-get install -y \
     build-essential \
-    libgeos-dev \
     python3-dev \
+    swig \
+    libgeos-dev \
+    libsm6 \
     libgl1-mesa-glx \
     libglib2.0-0 \
     libxrender1 \
@@ -28,13 +30,16 @@ RUN pip install --no-cache-dir --upgrade pip && \
 
 # 2. 分段安裝大型機器學習庫，降低 pip 解析與解壓時的記憶體峰值（避免 OOM Crash）
 # 先安裝 PaddlePaddle CPU 版
+# 安裝前先升級 pip 以獲取更好的依賴解析能力
+RUN pip install --no-cache-dir --upgrade pip
 RUN pip install --no-cache-dir paddlepaddle==2.6.1 -i https://www.paddlepaddle.org.cn/packages/stable/cpu/
 
-# 預先安裝 PaddleOCR 的編譯依賴，避免在安裝 paddleocr 時併發編譯導致 OOM
-RUN pip install --no-cache-dir shapely pyclipper lanms-neo
+# 預先安裝 PaddleOCR 的編譯依賴，添加 swig 與單獨安裝以節省記憶體
+RUN pip install --no-cache-dir swig
+RUN pip install --no-cache-dir lanms-neo
+RUN pip install --no-cache-dir shapely pyclipper
 
 # 最後安裝 PaddleOCR 與 Faster-Whisper
-# 這裡附帶安裝 opencv-python-headless 以防止 paddleocr 強制重裝帶 GUI 的 opencv-python
 RUN pip install --no-cache-dir paddleocr==2.8.1 opencv-python-headless
 RUN pip install --no-cache-dir faster-whisper==1.0.3
 
