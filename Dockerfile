@@ -6,6 +6,7 @@ RUN apt-get update && apt-get install -y \
     build-essential \
     python3-dev \
     swig \
+    cmake \
     libgeos-dev \
     libsm6 \
     libgl1-mesa-glx \
@@ -19,19 +20,19 @@ RUN apt-get update && apt-get install -y \
 RUN useradd -m -u 1000 user
 USER user
 ENV HOME=/home/user \
-    PATH=/home/user/.local/bin:$PATH
+    PATH=/home/user/.local/bin:$PATH \
+    PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION=python
 
 WORKDIR $HOME/app
 
 # 1. 先複製基本依賴清單並安裝
 COPY --chown=user requirements.txt $HOME/app/requirements.txt
 RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir numpy==1.26.4 && \
     pip install --no-cache-dir -r requirements.txt
 
 # 2. 分段安裝大型機器學習庫，降低 pip 解析與解壓時的記憶體峰值（避免 OOM Crash）
-# 先安裝 PaddlePaddle CPU 版
-# 安裝前先升級 pip 以獲取更好的依賴解析能力
-RUN pip install --no-cache-dir --upgrade pip
+# 使用 PaddlePaddle 官方 CPU 專用鏡像源
 RUN pip install --no-cache-dir paddlepaddle==2.6.1 -i https://www.paddlepaddle.org.cn/packages/stable/cpu/
 
 # 預先安裝 PaddleOCR 的編譯依賴，添加 swig 與單獨安裝以節省記憶體
@@ -40,7 +41,8 @@ RUN pip install --no-cache-dir lanms-neo
 RUN pip install --no-cache-dir shapely pyclipper
 
 # 最後安裝 PaddleOCR 與 Faster-Whisper
-RUN pip install --no-cache-dir paddleocr==2.8.1 opencv-python-headless
+# 這裡強制指定 opencv-python-headless 避免 paddleocr 拉下標準版
+RUN pip install --no-cache-dir paddleocr==2.8.1 opencv-python-headless==4.9.0.80
 RUN pip install --no-cache-dir faster-whisper==1.0.3
 
 # 3. 複製專案其餘檔案
