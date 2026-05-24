@@ -145,10 +145,6 @@ def run_ocr_on_pil(pil_img: Image.Image) -> str:
         except Exception as e:
             print(f"OCR 執行出錯: {e}")
             return ""
-                pass
-    except Exception as exc:
-        print(f"PaddleOCR subprocess invocation failed: {exc}")
-        return ""
 
 def extract_pdf_ocr(body: bytes) -> str:
     ocr_texts = []
