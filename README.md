@@ -1,3 +1,13 @@
+---
+title: MochiClass Free
+emoji: 🎒
+colorFrom: green
+colorTo: blue
+sdk: docker
+app_port: 7860
+pinned: false
+---
+
 # MochiClass
 
 MochiClass 是一個以 VaultSage API 為核心的學生課堂檔案整理工具。使用者可以輸入文字課表，並上傳講義、課堂照片、錄音等資料；系統會依照課程與檔案內容協助分類，讓學生點選課表中的課程後，就能集中查看該課相關的文件、照片、錄音與整理結果。
