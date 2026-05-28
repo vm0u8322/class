@@ -1719,7 +1719,14 @@ async function ensureCourseFileText(courseFiles, courseId) {
       if (newContent !== lastMessageContent) {
         lastMessageContent = newContent;
         loadingMsg.content = newContent;
-        renderChatHistory(courseId);
+        
+        // 🌟 優先嘗試進行極速局部 DOM 更新，徹底消滅重新渲染對話歷史產生的閃爍！
+        const loadingBubble = document.querySelector("#chatThread .chat-bubble.assistant.loading");
+        if (loadingBubble) {
+          loadingBubble.innerText = newContent;
+        } else {
+          renderChatHistory(courseId);
+        }
       }
     }
     // 每 800ms 輪詢檢查一次狀態
