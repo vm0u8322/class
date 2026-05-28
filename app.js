@@ -559,6 +559,9 @@ function parseScheduleText(text) {
     }
 
     const day = normalizeDay(normalizedLine) || currentDay;
+    if (normalizeDay(normalizedLine)) {
+      currentDay = day;
+    }
     const times = [...line.matchAll(/(\d{1,2}[:：]\d{2})/g)].map((match) => normalizeTime(match[1]));
     if (!day || times.length < 2) return;
 
