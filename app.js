@@ -68,7 +68,7 @@ const translations = {
     checkApi: "重新檢查",
     apiPanelDefault: "正式部署模式：API key 由後端環境變數提供，前端不保存 key。",
     uploadTitle: "拖曳或點擊此處上傳講義、照片、錄音、筆記",
-    uploadDesc: "API 連線後，上傳檔案會先依課表分類，再建立課程資料夾並送進 VaultSage；本機分類只是斷線時的備援。",
+    uploadDesc: "API 連線後，上傳檔案會先依課表分類，再建立課程資料夾並送進 VaultSage；本機分類只是斷線時的備援。（建議單一講義/照片/錄音限制於 20MB 內以確保最佳速度）",
     pickFiles: "選擇檔案",
     queueTitle: "檔案佇列",
     clear: "清空",
@@ -126,7 +126,7 @@ const translations = {
     checkApi: "Check",
     apiPanelDefault: "Production mode: the API key is provided by backend environment variables.",
     uploadTitle: "Drag or click here to upload handouts, photos, recordings, notes",
-    uploadDesc: "After API connection, files are classified by timetable, organized into course folders, and synced to VaultSage.",
+    uploadDesc: "After API connection, files are classified by timetable, organized into course folders, and synced to VaultSage. (Max 20MB per file recommended for best speed)",
     pickFiles: "Choose files",
     queueTitle: "File Queue",
     clear: "Clear",
@@ -184,7 +184,7 @@ const translations = {
     checkApi: "다시 확인",
     apiPanelDefault: "배포 모드: API key는 백엔드 환경 변수로 관리됩니다.",
     uploadTitle: "여기로 드래그하거나 클릭하여 자료, 사진, 녹음, 노트 업로드",
-    uploadDesc: "API 연결 후 파일은 시간표 기준으로 분류되고 VaultSage의 수업 폴더에 동기화됩니다.",
+    uploadDesc: "API 연결 후 파일은 시간표 기준으로 분류되고 VaultSage에 동기화됩니다 (최적의 성능을 위해 단일 파일 20MB 이하 권장).",
     pickFiles: "파일 선택",
     queueTitle: "파일 대기열",
     clear: "비우기",
@@ -1269,17 +1269,37 @@ async function addFiles(files) {
   const rawListArray = Array.from(files);
   if (!rawListArray.length) return;
 
-  // 加入去重過濾，防止佇列重複與 Prompt 膨脹
+  // 加入大小與去重過濾，防杜 OOM 並防止佇列重複
+  const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20MB 限制
+  const tooLargeFiles = rawListArray.filter(f => f.size > MAX_FILE_SIZE).map(f => f.name);
+  
   const fileListArray = rawListArray.filter(f => {
+    if (f.size > MAX_FILE_SIZE) {
+      console.warn(`檔案過大已跳過: ${f.name} (${(f.size / (1024 * 1024)).toFixed(1)}MB)`);
+      return false;
+    }
     const isDup = state.files.some(existing => existing.name === f.name);
     if (isDup) {
       console.log(`檔案重複已跳過: ${f.name}`);
+      return false;
     }
-    return !isDup;
+    return true;
   });
 
+  if (tooLargeFiles.length > 0) {
+    const errorMsg = tt(
+      `檔案「${tooLargeFiles.join("、")}」超過單一檔案 20MB 大小限制，已自動跳過以確保辨識效能與雲端穩定度。`,
+      `File(s) "${tooLargeFiles.join(", ")}" exceed 20MB limit and were skipped for performance stability.`,
+      `파일 "${tooLargeFiles.join(", ")}"이(가) 20MB 제한을 초과하여 성능 안정성을 위해 자동으로 제외되었습니다.`
+    );
+    answerBox.textContent = errorMsg;
+    showBackgroundStatus(errorMsg);
+  }
+
   if (!fileListArray.length) {
-    answerBox.textContent = "上傳的檔案都已經存在於佇列中，已自動跳過重複檔案。";
+    if (tooLargeFiles.length === 0) {
+      answerBox.textContent = tt("上傳的檔案都已經存在於佇列中，已自動跳過重複檔案。", "Uploaded files already exist in queue, skipped duplicate files.", "업로드한 파일이 이미 대기열에 존재하여 중복 파일이 자동으로 제외되었습니다.");
+    }
     return;
   }
 
