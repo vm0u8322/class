@@ -50,6 +50,7 @@ let persistTimer = null;
 let dbPromise = null;
 let isRestoring = false;
 let activeView = "schedule";
+let textProcessingPromise = Promise.resolve();
 
 const defaultScheduleText = "";
 const LANG_KEY = "mochiclass-lang";
@@ -1096,6 +1097,82 @@ async function enrichFileLike(fileLike) {
   return fileLike;
 }
 
+async function processFileTextBatch(filesToProcess, { syncAfter = true } = {}) {
+  const targets = filesToProcess.filter((file) => file.sourceFile);
+  if (!targets.length) return;
+
+  showBackgroundStatus(fmt(tt(
+    "已加入 {total} 個檔案，正在立即進行 OCR / 文字抽取...",
+    "Added {total} file(s). OCR / text extraction is starting now...",
+    "{total}개 파일을 추가했습니다. OCR / 텍스트 추출을 바로 시작합니다..."
+  ), { total: targets.length }));
+
+  for (const file of targets) {
+    try {
+      file.uploadStatus = "processing";
+      showBackgroundStatus(fmt(tt(
+        "正在辨識 {file}...",
+        "Reading {file}...",
+        "{file} 인식 중..."
+      ), { file: file.name }));
+      render();
+
+      await enrichFileLike(file.sourceFile);
+      file.sourceText = file.sourceFile.sourceText || "";
+
+      const reClassified = classifyFile({
+        name: file.name,
+        size: file.size,
+        lastModified: file.lastModified,
+        sourceFile: file.sourceFile,
+        sourceText: file.sourceText,
+      });
+
+      file.courseId = reClassified.courseId;
+      file.confidence = reClassified.confidence;
+      file.reasons = reClassified.reasons;
+      file.uploadStatus = file.sourceText ? "local" : "failed";
+      render();
+    } catch (err) {
+      console.error(`處理檔案失敗: ${file.name}`, err);
+      file.uploadStatus = "failed";
+      render();
+    }
+  }
+
+  const extractedCount = targets.filter((file) => file.sourceText).length;
+  const missingTextCount = targets.filter((file) => !file.sourceText).length;
+  showBackgroundStatus(fmt(tt(
+    "OCR / 文字抽取完成：{total} 個檔案跑完，{extracted} 個讀到文字，{missing} 個未讀到文字。",
+    "OCR / text extraction finished: {total} file(s) processed, {extracted} with text, {missing} without text.",
+    "OCR / 텍스트 추출 완료: {total}개 처리, {extracted}개 텍스트 추출, {missing}개 텍스트 없음."
+  ), { total: targets.length, extracted: extractedCount, missing: missingTextCount }));
+
+  if (syncAfter && state.apiReady) {
+    (async () => {
+      try {
+        await classifyTextFilesByApi(targets);
+        render();
+      } catch (err) {
+        console.warn("API classification failed for batch:", err);
+      }
+      try {
+        await syncFilesToApi(targets);
+        render();
+      } catch (err) {
+        console.warn("API sync failed for batch:", err);
+      }
+    })();
+  }
+}
+
+function queueTextProcessing(filesToProcess, options) {
+  textProcessingPromise = textProcessingPromise
+    .catch(() => {})
+    .then(() => processFileTextBatch(filesToProcess, options));
+  return textProcessingPromise;
+}
+
 async function addFiles(files) {
   const rawListArray = Array.from(files);
   if (!rawListArray.length) return;
@@ -1122,6 +1199,8 @@ async function addFiles(files) {
   state.files.push(...newFiles);
   render();
   switchView("files", true);
+  queueTextProcessing(newFiles, { syncAfter: true });
+  return;
   
   showBackgroundStatus(`已加入 ${newFiles.length} 個檔案，正在背景排隊進行文字辨識與 AI 分析...`);
 
@@ -2011,6 +2090,14 @@ async function boot() {
   render();
   switchView(activeView, false);
   await checkApiStatus();
+  const restoredWithoutText = state.files.filter((file) => (
+    file.sourceFile
+    && !file.sourceText
+    && ["image", "document", "audio", "note"].includes(file.type)
+  ));
+  if (restoredWithoutText.length) {
+    queueTextProcessing(restoredWithoutText, { syncAfter: true });
+  }
   applyTranslations();
 }
 
