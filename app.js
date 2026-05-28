@@ -1709,12 +1709,16 @@ async function ensureCourseFileText(courseFiles, courseId) {
   const needsText = courseFiles.filter((file) => (
     file.sourceFile
     && !file.sourceText
+    && file.uploadStatus !== "failed" // 如果已經辨識失敗過，不重複進行辨識，防堵背景重覆 OCR 卡死
     && ["image", "document", "audio", "note"].includes(file.type)
   ));
   if (!needsText.length) return;
 
   const history = state.chatHistories[courseId] || [];
-  const loadingMsg = history.find((msg) => msg.role === "assistant" && msg.isLoading);
+  // 🌟 使用倒序搜尋，確保精準更新最下方（最新）的載入中泡泡，防止更新到上方殘留的舊載入狀態
+  const loadingMsg = history.findLast 
+    ? history.findLast((msg) => msg.role === "assistant" && msg.isLoading) 
+    : [...history].reverse().find((msg) => msg.role === "assistant" && msg.isLoading);
   if (loadingMsg) {
     loadingMsg.content = `正在重新辨識這堂課 ${needsText.length} 個尚未讀到內容的檔案...`;
     renderChatHistory(courseId);
@@ -2092,7 +2096,10 @@ document.querySelector("#askForm").addEventListener("submit", async (event) => {
       }
       
       const history = state.chatHistories[course.id];
-      const loadingMsg = history.find((msg) => msg.role === "assistant" && msg.isLoading);
+      // 🌟 使用倒序搜尋，確保精準更新最下方（最新）的載入中泡泡，防止更新到上方殘留的舊載入狀態
+      const loadingMsg = history.findLast 
+        ? history.findLast((msg) => msg.role === "assistant" && msg.isLoading) 
+        : [...history].reverse().find((msg) => msg.role === "assistant" && msg.isLoading);
       if (loadingMsg) {
         loadingMsg.content = result.answer || "API 沒有回傳答案。";
         loadingMsg.isLoading = false;
@@ -2101,7 +2108,10 @@ document.querySelector("#askForm").addEventListener("submit", async (event) => {
       persistStateSoon();
     }).catch((error) => {
       const history = state.chatHistories[course.id];
-      const loadingMsg = history.find((msg) => msg.role === "assistant" && msg.isLoading);
+      // 🌟 使用倒序搜尋，確保精準更新最下方（最新）的載入中泡泡，防止更新到上方殘留的舊載入狀態
+      const loadingMsg = history.findLast 
+        ? history.findLast((msg) => msg.role === "assistant" && msg.isLoading) 
+        : [...history].reverse().find((msg) => msg.role === "assistant" && msg.isLoading);
       if (loadingMsg) {
         loadingMsg.content = `API 問答失敗，先用本機整理：\n\n${summarizeSelectedCourse(question)}\n\n錯誤：${error.message}`;
         loadingMsg.isLoading = false;
@@ -2112,7 +2122,10 @@ document.querySelector("#askForm").addEventListener("submit", async (event) => {
   } else {
     // API 未連線，落入本機備援 Q&A
     const history = state.chatHistories[course.id];
-    const loadingMsg = history.find((msg) => msg.role === "assistant" && msg.isLoading);
+    // 🌟 使用倒序搜尋，確保精準更新最下方（最新）的載入中泡泡，防止更新到上方殘留的舊載入狀態
+    const loadingMsg = history.findLast 
+      ? history.findLast((msg) => msg.role === "assistant" && msg.isLoading) 
+      : [...history].reverse().find((msg) => msg.role === "assistant" && msg.isLoading);
     if (loadingMsg) {
       loadingMsg.content = summarizeSelectedCourse(question);
       loadingMsg.isLoading = false;
