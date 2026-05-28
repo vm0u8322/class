@@ -103,6 +103,10 @@ const translations = {
     progressEmpty: "尚未上傳資料",
     progressWorking: "辨識進度",
     progressDone: "辨識完成",
+    textReady: "已讀到文字",
+    textMissing: "未讀到文字",
+    waiting: "等待中",
+    recognizing: "辨識中",
   },
   en: {
     tagline: "API-first class file manager",
@@ -153,6 +157,10 @@ const translations = {
     progressEmpty: "No files yet",
     progressWorking: "Processing",
     progressDone: "Done",
+    textReady: "Text extracted",
+    textMissing: "No text found",
+    waiting: "Waiting",
+    recognizing: "Reading",
   },
   ko: {
     tagline: "API 우선 수업 파일 관리자",
@@ -203,6 +211,10 @@ const translations = {
     progressEmpty: "자료 없음",
     progressWorking: "처리 중",
     progressDone: "완료",
+    textReady: "텍스트 추출됨",
+    textMissing: "텍스트 없음",
+    waiting: "대기 중",
+    recognizing: "인식 중",
   },
 };
 let currentLang = localStorage.getItem(LANG_KEY) || "zh";
@@ -870,6 +882,7 @@ function fileCardHtml(file) {
       <strong>${file.name}</strong>
       <small>${typeLabel(file.type)} / ${formatDate(file.lastModified)}${previewHint}</small>
       <div class="match">${file.vaultFileId ? `VaultSage: ${file.vaultFileId.slice(0, 8)}` : (file.reasons.join("、") || t("noClue"))}</div>
+      <small>${extractionLabel(file)}</small>
     </article>
   `;
 }
@@ -1097,7 +1110,7 @@ async function addFiles(files) {
         file.courseId = reClassified.courseId;
         file.confidence = reClassified.confidence;
         file.reasons = reClassified.reasons;
-        file.uploadStatus = "local";
+        file.uploadStatus = file.sourceText ? "local" : "failed";
         render();
 
         // 如果 API 已連線，執行 AI 分類與自動同步
@@ -1161,6 +1174,14 @@ function typeLabel(type) {
     audio: t("audio"),
     note: t("note"),
   }[type] || "File";
+}
+
+function extractionLabel(file) {
+  if (file.sourceText) return t("textReady");
+  if (file.uploadStatus === "processing") return t("recognizing");
+  if (file.uploadStatus === "pending") return t("waiting");
+  if (["image", "document", "audio", "note"].includes(file.type)) return t("textMissing");
+  return file.uploadStatus || "";
 }
 
 function courseProgress(files) {
@@ -1253,7 +1274,7 @@ function renderFiles() {
         <strong>${file.name}</strong>
         <small>${typeLabel(file.type)} / ${formatDate(file.lastModified)}${file.previewUrl ? t("previewHint") : ""}</small>
         <div class="match">${course ? `${t("matchedTo")}：${course.title}，${t("confidence")} ${file.confidence}%` : t("unmatched")}</div>
-        <small>${file.reasons.join("、") || t("noClue")} / ${file.vaultFileId ? `API: ${file.vaultFileId.slice(0, 8)}` : file.uploadStatus}</small>
+        <small>${file.reasons.join("、") || t("noClue")} / ${file.vaultFileId ? `API: ${file.vaultFileId.slice(0, 8)}` : extractionLabel(file)}</small>
       </article>
     `;
   }).join("");
@@ -1273,6 +1294,7 @@ function renderCourseDetail() {
   const visible = state.activeType === "all" ? files : files.filter((file) => file.type === state.activeType);
   courseTitle.textContent = course.title;
   courseMeta.textContent = `${formatSessions(course)} / 關鍵字：${course.keywords.join("、")}`;
+  renderChatHistory(course.id);
 
   if (!visible.length) {
     courseFiles.innerHTML = `<div class="empty">${t("emptyCategory")}</div>`;
@@ -1361,11 +1383,12 @@ function renderChatHistory(courseId) {
   
   if (history.length === 0) {
     if (copyBtn) copyBtn.style.display = "none";
-    answerBox.innerHTML = currentLang === "zh"
+    const greeting = currentLang === "zh"
       ? `已切換至「${course.title}」。您可以於上方輸入問題並點選「整理」，我將根據本課堂上傳的講義、白板照片 OCR 文字或錄音逐字稿，為您快速梳理重點！`
       : currentLang === "ko"
         ? `「${course.title}」 수업으로 전환했습니다. 질문을 입력하면 업로드된 자료, 사진 OCR, 녹음 내용을 바탕으로 정리합니다.`
         : `Switched to "${course.title}". Ask a question and I will organize answers from uploaded handouts, photo OCR, and recordings.`;
+    answerBox.innerHTML = `<div class="chat-thread"><div class="chat-bubble assistant">${greeting}</div></div>`;
     return;
   }
 
@@ -1457,6 +1480,7 @@ async function ensureCourseFileText(courseFiles, courseId) {
   const needsText = courseFiles.filter((file) => (
     file.sourceFile
     && !file.sourceText
+    && file.uploadStatus !== "failed"
     && ["image", "document", "audio", "note"].includes(file.type)
   ));
   if (!needsText.length) return;
@@ -1473,17 +1497,13 @@ async function ensureCourseFileText(courseFiles, courseId) {
         loadingMsg.content = `正在辨識 ${file.name}...`;
         renderChatHistory(courseId);
       }
-      file.uploadStatus = "processing";
-      renderSchedule();
-      renderFiles();
-      renderCourseDetail();
       await enrichFileLike(file.sourceFile);
       file.sourceText = file.sourceFile.sourceText || "";
-      file.uploadStatus = file.sourceText ? "local" : "pending";
+      file.uploadStatus = file.sourceText ? "local" : "failed";
       renderSchedule();
     } catch (error) {
       console.warn("Re-OCR failed:", file.name, error);
-      file.uploadStatus = "pending";
+      file.uploadStatus = "failed";
     }
   }
   render();
