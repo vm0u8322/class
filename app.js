@@ -1709,29 +1709,61 @@ function summarizeSelectedCourse(question) {
 }
 
 async function ensureCourseFileText(courseFiles, courseId) {
-  const needsText = courseFiles.filter((file) => (
-    file.sourceFile
-    && !file.sourceText
-    && file.uploadStatus !== "failed" // 如果已經辨識失敗過，不重複進行辨識，防堵背景重覆 OCR 卡死
-    && ["image", "document", "audio", "note"].includes(file.type)
-  ));
-  if (!needsText.length) return;
-
   const history = state.chatHistories[courseId] || [];
   // 🌟 使用倒序搜尋，確保精準更新最下方（最新）的載入中泡泡，防止更新到上方殘留的舊載入狀態
   const loadingMsg = history.findLast 
     ? history.findLast((msg) => msg.role === "assistant" && msg.isLoading) 
     : [...history].reverse().find((msg) => msg.role === "assistant" && msg.isLoading);
+
+  // 1. 🌟 第一階段：如果該學科有檔案已在背景處理佇列中（pending 或 processing），原地優雅等候其完成，防止重複發送 API 請求！
+  let hasPendingOrProcessing = courseFiles.some((file) => 
+    file.sourceFile 
+    && !file.sourceText 
+    && ["pending", "processing"].includes(file.uploadStatus)
+  );
+
+  while (hasPendingOrProcessing) {
+    const runningFile = courseFiles.find((file) => 
+      file.sourceFile 
+      && !file.sourceText 
+      && ["pending", "processing"].includes(file.uploadStatus)
+    );
+    if (loadingMsg && runningFile) {
+      loadingMsg.content = `正在等候背景語音轉錄/檔案辨識佇列完成... ⏳\n(目前處理中：${runningFile.name})`;
+      renderChatHistory(courseId);
+    }
+    // 每 800ms 輪詢檢查一次狀態
+    await new Promise((resolve) => setTimeout(resolve, 800));
+    hasPendingOrProcessing = courseFiles.some((file) => 
+      file.sourceFile 
+      && !file.sourceText 
+      && ["pending", "processing"].includes(file.uploadStatus)
+    );
+  }
+
+  // 2. 🌟 第二階段：收集真正需要「全新處理」且未在佇列中的檔案
+  const needsText = courseFiles.filter((file) => (
+    file.sourceFile
+    && !file.sourceText
+    && file.uploadStatus !== "failed"
+    && !["pending", "processing"].includes(file.uploadStatus)
+    && ["image", "document", "audio", "note"].includes(file.type)
+  ));
+  if (!needsText.length) return;
+
   if (loadingMsg) {
-    loadingMsg.content = `正在重新辨識這堂課 ${needsText.length} 個尚未讀到內容的檔案...`;
+    loadingMsg.content = `正在解析這堂課 ${needsText.length} 個尚未辨識內容的檔案...`;
     renderChatHistory(courseId);
   }
+
   for (const file of needsText) {
     try {
       if (loadingMsg) {
         loadingMsg.content = `正在辨識 ${file.name}...`;
         renderChatHistory(courseId);
       }
+      file.uploadStatus = "processing";
+      renderSchedule();
       await enrichFileLike(file.sourceFile);
       file.sourceText = file.sourceFile.sourceText || "";
       file.uploadStatus = file.sourceText ? "local" : "failed";
