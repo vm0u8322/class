@@ -1151,21 +1151,6 @@ async function addFiles(files) {
         file.uploadStatus = file.sourceText ? "local" : "failed";
         render();
 
-        // 如果 API 已連線，執行 AI 分類與自動同步
-        if (state.apiReady) {
-          try {
-            await classifyTextFilesByApi([file]);
-            render();
-          } catch (err) {
-            console.warn("API classification failed for file:", file.name, err);
-          }
-          try {
-            await syncFilesToApi([file]);
-            render();
-          } catch (err) {
-            console.warn("API sync failed for file:", file.name, err);
-          }
-        }
       } catch (err) {
         console.error(`處理檔案失敗: ${file.name}`, err);
         file.uploadStatus = "failed";
@@ -1183,6 +1168,23 @@ async function addFiles(files) {
     "Background processing finished: {total} file(s) processed, {extracted} with extracted text, {missing} without text.",
     "백그라운드 처리 완료: {total}개 파일 처리, {extracted}개 텍스트 추출, {missing}개 텍스트 없음."
   ), { total: newFiles.length, extracted: extractedCount, missing: missingTextCount }));
+
+  if (state.apiReady) {
+    (async () => {
+      try {
+        await classifyTextFilesByApi(newFiles);
+        render();
+      } catch (err) {
+        console.warn("API classification failed for batch:", err);
+      }
+      try {
+        await syncFilesToApi(newFiles);
+        render();
+      } catch (err) {
+        console.warn("API sync failed for batch:", err);
+      }
+    })();
+  }
 }
 
 async function loadSampleCourseDocs() {
