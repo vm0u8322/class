@@ -1183,51 +1183,45 @@ async function enrichFileLike(fileLike) {
   return fileLike;
 }
 
-async function processFileTextBatch(filesToProcess, { syncAfter = true } = {}) {
-  const targets = filesToProcess.filter((file) => file.sourceFile);
-  if (!targets.length) return;
+let isSchedulerRunning = false;
 
-  showBackgroundStatus(fmt(tt(
-    "已加入 {total} 個檔案，正在立即進行 OCR / 文字抽取...",
-    "Added {total} file(s). OCR / text extraction is starting now...",
-    "{total}개 파일을 추가했습니다. OCR / 텍스트 추출을 바로 시작합니다..."
-  ), { total: targets.length }));
+async function triggerQueueScheduler() {
+  if (isSchedulerRunning) return;
+  isSchedulerRunning = true;
 
-  for (const file of targets) {
-    try {
-      file.uploadStatus = "processing";
-      showBackgroundStatus(fmt(tt(
-        "正在辨識 {file}...",
-        "Reading {file}...",
-        "{file} 인식 중..."
-      ), { file: file.name }));
-      render();
+  try {
+    while (true) {
+      const pendingFiles = state.files.filter((f) => f.sourceFile && f.uploadStatus === "pending");
+      if (!pendingFiles.length) break;
 
-      await enrichFileLike(file.sourceFile);
-      file.sourceText = file.sourceFile.sourceText || "";
-      file.uploadStatus = file.sourceText ? "local" : "failed";
-      render();
-    } catch (err) {
-      console.error(`處理檔案失敗: ${file.name}`, err);
-      file.uploadStatus = "failed";
-      render();
+      // 🌟 優先級判定：將 image (圖片) 與 document (講義/文檔/PDF) 設為最高優先，優先於較耗時的 audio (錄音)
+      const highPriority = pendingFiles.filter((f) => f.type === "image" || f.type === "document");
+      const fileToProcess = highPriority.length ? highPriority[0] : pendingFiles[0];
+
+      try {
+        fileToProcess.uploadStatus = "processing";
+        showBackgroundStatus(fmt(tt(
+          "正在辨識 {file}...",
+          "Reading {file}...",
+          "{file} 인식 중..."
+        ), { file: fileToProcess.name }));
+        render();
+
+        await enrichFileLike(fileToProcess.sourceFile);
+        fileToProcess.sourceText = fileToProcess.sourceFile.sourceText || "";
+        fileToProcess.uploadStatus = fileToProcess.sourceText ? "local" : "failed";
+        render();
+      } catch (err) {
+        console.error(`處理檔案失敗: ${fileToProcess.name}`, err);
+        fileToProcess.uploadStatus = "failed";
+        render();
+      }
     }
+    
+    showBackgroundStatus(t("workIdle"));
+  } finally {
+    isSchedulerRunning = false;
   }
-
-  const extractedCount = targets.filter((file) => file.sourceText).length;
-  const missingTextCount = targets.filter((file) => !file.sourceText).length;
-  showBackgroundStatus(fmt(tt(
-    "OCR / 文字抽取完成：{total} 個檔案跑完，{extracted} 個讀到文字，{missing} 個未讀到文字。",
-    "OCR / text extraction finished: {total} file(s) processed, {extracted} with text, {missing} without text.",
-    "OCR / 텍스트 추출 완료: {total}개 처리, {extracted}개 텍스트 추출, {missing}개 텍스트 없음."
-  ), { total: targets.length, extracted: extractedCount, missing: missingTextCount }));
-}
-
-function queueTextProcessing(filesToProcess, options) {
-  textProcessingPromise = textProcessingPromise
-    .catch(() => {})
-    .then(() => processFileTextBatch(filesToProcess, options));
-  return textProcessingPromise;
 }
 
 async function addFiles(files) {
@@ -1276,7 +1270,7 @@ async function addFiles(files) {
   state.files.push(...newFiles);
   render();
   switchView("files", true);
-  queueTextProcessing(newFiles, { syncAfter: true });
+  triggerQueueScheduler();
   return;
   
   showBackgroundStatus(`已加入 ${newFiles.length} 個檔案，正在背景排隊進行文字辨識與 AI 分析...`);
@@ -2246,7 +2240,10 @@ async function boot() {
     && ["image", "document", "audio", "note"].includes(file.type)
   ));
   if (restoredWithoutText.length) {
-    queueTextProcessing(restoredWithoutText, { syncAfter: true });
+    restoredWithoutText.forEach((file) => {
+      file.uploadStatus = "pending";
+    });
+    triggerQueueScheduler();
   }
   applyTranslations();
 }
