@@ -45,6 +45,11 @@ RUN pip install --no-cache-dir shapely pyclipper
 RUN pip install --no-cache-dir paddleocr==2.8.1 opencv-python-headless==4.9.0.80
 RUN pip install --no-cache-dir faster-whisper==1.0.3
 
+# 🌟 預先下載 PaddleOCR 與 Faster-Whisper 模型，確保雲端啟動後 100% 本地加載，免除漫長下載造成的超時與卡頓！
+RUN python -c "from paddleocr import PaddleOCR; PaddleOCR(text_detection_model_name='PP-OCRv4_mobile_det', text_recognition_model_name='PP-OCRv4_mobile_rec', use_doc_orientation_classify=False, use_doc_unwarping=False, use_textline_orientation=False, enable_mkldnn=False)"
+RUN python -c "from faster_whisper import WhisperModel; WhisperModel('tiny', device='cpu', compute_type='int8', download_root='/home/user/app/tools/whisper_models')"
+
+
 # 3. 複製專案其餘檔案
 COPY --chown=user . $HOME/app
 
