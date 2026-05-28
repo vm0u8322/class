@@ -43,7 +43,7 @@ def main():
         )
         
         pil_img = Image.open(image_path)
-        max_size = 1200
+        max_size = 2000
         if max(pil_img.size) > max_size:
             pil_img.thumbnail((max_size, max_size), Image.Resampling.LANCZOS)
         

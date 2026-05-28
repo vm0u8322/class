@@ -424,6 +424,7 @@ h2 {
   place-items: center;
   text-align: center;
   padding: 28px;
+  cursor: pointer;
   transition:
     background 0.2s ease,
     border-color 0.2s ease,
@@ -935,4 +936,29 @@ h2 {
     scroll-behavior: auto !important;
     transition-duration: 0.001ms !important;
   }
+}
+
+
+/* 🌟 手動重新分類時的 Premium 綠色光圈浮起與收縮動畫 */
+@keyframes itemGlow {
+  0% {
+    box-shadow: 0 0 0 5px rgba(33, 122, 107, 0.45);
+    border-color: var(--accent);
+    transform: scale(1.02) translateY(-4px);
+  }
+  50% {
+    box-shadow: 0 0 0 8px rgba(33, 122, 107, 0.22);
+    transform: scale(1.01) translateY(-2px);
+  }
+  100% {
+    box-shadow: var(--shadow-sm);
+    border-color: var(--line);
+    transform: scale(1) translateY(0);
+  }
+}
+
+.file-item.just-reassigned {
+  animation: itemGlow 0.85s cubic-bezier(0.25, 0.8, 0.25, 1) both;
+  z-index: 10;
+  position: relative;
 }

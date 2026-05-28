@@ -121,7 +121,7 @@ def get_whisper():
 
 def run_ocr_on_pil(pil_img: Image.Image) -> str:
     # Keep the OCR model cached in this server process; PaddleOCR v3 uses predict().
-    max_size = 1000
+    max_size = 2000
     if max(pil_img.size) > max_size:
         pil_img = pil_img.copy()
         pil_img.thumbnail((max_size, max_size), Image.Resampling.LANCZOS)

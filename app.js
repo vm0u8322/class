@@ -67,7 +67,7 @@ const translations = {
     apiTitle: "VaultSage API 主連線",
     checkApi: "重新檢查",
     apiPanelDefault: "正式部署模式：API key 由後端環境變數提供，前端不保存 key。",
-    uploadTitle: "上傳講義、照片、錄音、筆記",
+    uploadTitle: "拖曳或點擊此處上傳講義、照片、錄音、筆記",
     uploadDesc: "API 連線後，上傳檔案會先依課表分類，再建立課程資料夾並送進 VaultSage；本機分類只是斷線時的備援。",
     pickFiles: "選擇檔案",
     queueTitle: "檔案佇列",
@@ -108,6 +108,10 @@ const translations = {
     textMissing: "未讀到文字",
     waiting: "等待中",
     recognizing: "辨識中",
+    reclassifyLabel: "手動分配科：",
+    unmatchedOption: "-- 尚未配到課程 --",
+    manualReassignReason: "手動重分配：{course}",
+    manualReassignUnassigned: "手動重分配：未指定科目",
   },
   en: {
     tagline: "Schedule-driven smart class file manager",
@@ -121,7 +125,7 @@ const translations = {
     apiTitle: "VaultSage API",
     checkApi: "Check",
     apiPanelDefault: "Production mode: the API key is provided by backend environment variables.",
-    uploadTitle: "Upload handouts, photos, recordings, notes",
+    uploadTitle: "Drag or click here to upload handouts, photos, recordings, notes",
     uploadDesc: "After API connection, files are classified by timetable, organized into course folders, and synced to VaultSage.",
     pickFiles: "Choose files",
     queueTitle: "File Queue",
@@ -162,6 +166,10 @@ const translations = {
     textMissing: "No text found",
     waiting: "Waiting",
     recognizing: "Reading",
+    reclassifyLabel: "Reassign to: ",
+    unmatchedOption: "-- Unassigned --",
+    manualReassignReason: "Manual reassign: {course}",
+    manualReassignUnassigned: "Manual reassign: Unassigned",
   },
   ko: {
     tagline: "시간표 기반 스마트 수업 파일 관리자",
@@ -175,7 +183,7 @@ const translations = {
     apiTitle: "VaultSage API 연결",
     checkApi: "다시 확인",
     apiPanelDefault: "배포 모드: API key는 백엔드 환경 변수로 관리됩니다.",
-    uploadTitle: "자료, 사진, 녹음, 노트 업로드",
+    uploadTitle: "여기로 드래그하거나 클릭하여 자료, 사진, 녹음, 노트 업로드",
     uploadDesc: "API 연결 후 파일은 시간표 기준으로 분류되고 VaultSage의 수업 폴더에 동기화됩니다.",
     pickFiles: "파일 선택",
     queueTitle: "파일 대기열",
@@ -216,6 +224,10 @@ const translations = {
     textMissing: "텍스트 없음",
     waiting: "대기 중",
     recognizing: "인식 중",
+    reclassifyLabel: "과목 수동 분류: ",
+    unmatchedOption: "-- 지정되지 않음 --",
+    manualReassignReason: "수동 분류: {course}",
+    manualReassignUnassigned: "수동 분류: 지정되지 않음",
   },
 };
 let currentLang = localStorage.getItem(LANG_KEY) || "zh";
@@ -290,6 +302,7 @@ function setLanguage(lang) {
   localStorage.setItem(LANG_KEY, currentLang);
   applyTranslations();
   render();
+  checkApiStatus().catch(() => {}); // 🌟 確保 API 狀態與連線文字立刻更新為對應語言！
 }
 
 function makeDate(date, time) {
@@ -799,22 +812,30 @@ function scoreFileForCourse(file, course) {
   let score = 0;
   const reasons = [];
 
-  for (const keyword of [course.title, ...(course.keywords || [])]) {
-    if (keyword && name.includes(keyword.toLowerCase())) {
-      score += 4;
-      reasons.push(`檔名含「${keyword}」`);
-      break;
+  const isTimePrimary = file.type === "image" || file.type === "audio";
+
+  // 1. 檔名關鍵字比對 (僅限講義和筆記比對檔名，圖片與錄音檔名是亂的不比對)
+  if (!isTimePrimary) {
+    for (const keyword of [course.title, ...(course.keywords || [])]) {
+      if (keyword && name.includes(keyword.toLowerCase())) {
+        score += 10;
+        reasons.push(`檔名含「${keyword}」`);
+        break;
+      }
     }
   }
 
+  // 2. 內容關鍵字比對
   for (const keyword of [course.title, ...(course.keywords || [])]) {
     if (keyword && content.includes(keyword.toLowerCase())) {
-      score += 6;
+      const contentScore = isTimePrimary ? 2 : 15;
+      score += contentScore;
       reasons.push(`內容提到「${keyword}」`);
       break;
     }
   }
 
+  // 3. 時間比對
   if (file.lastModified) {
     const date = new Date(file.lastModified);
     const minute = date.getHours() * 60 + date.getMinutes();
@@ -828,14 +849,15 @@ function scoreFileForCourse(file, course) {
       && minute <= minutesOfDay(session.end) + 20
     ));
     if (inWindowSession) {
-      const timeScore = file.type === "audio" ? 10 : 3;
+      const timeScore = isTimePrimary ? 20 : 3;
       score += timeScore;
       const timeLabel = file.type === "audio" ? "錄音時間" : "拍攝/建立時間";
       reasons.push(`${timeLabel}落在 ${inWindowSession.day} ${inWindowSession.start}-${inWindowSession.end}`);
     } else if (sameDaySession) {
-      const sameDayScore = file.type === "audio" ? 2 : 1;
+      const sameDayScore = isTimePrimary ? 5 : 1;
       score += sameDayScore;
-      reasons.push(file.type === "audio" ? "錄音日期與課程同一天" : "同一天建立");
+      const sameDayLabel = file.type === "audio" ? "錄音日期與課程同一天" : "同一天建立/拍攝";
+      reasons.push(sameDayLabel);
     }
   }
 
@@ -915,23 +937,79 @@ function fileCardHtml(file) {
     ? `<img class="file-thumb" src="${file.previewUrl}" alt="${file.name}">`
     : "";
   const previewHint = file.type === "image" && file.previewUrl ? t("previewHint") : "";
+  
+  // 🌟 手動重新配對科目的下拉選單
+  const selectHtml = `
+    <div class="reclassify-selector" style="margin-top: 8px; display: flex; align-items: center; gap: 6px;">
+      <span style="font-size: 0.8rem; opacity: 0.8; color: var(--ink);">${t("reclassifyLabel")}</span>
+      <select class="move-course-select" data-file-id="${file.id}" style="padding: 2px 6px; font-size: 0.8rem; border-radius: 4px; border: 1px solid var(--line); background: #fff; cursor: pointer; color: var(--ink);">
+        <option value="" ${!file.courseId ? "selected" : ""}>${t("unmatchedOption")}</option>
+        ${state.schedule.map(c => `
+          <option value="${c.id}" ${file.courseId === c.id ? "selected" : ""}>${c.title}</option>
+        `).join("")}
+      </select>
+    </div>
+  `;
+
   return `
     <article class="file-item type-${file.type} ${file.previewUrl ? "is-previewable" : ""}" data-file-id="${file.id}">
       ${preview}
       <strong>${file.name}</strong>
       <small>${typeLabel(file.type)} / ${formatDate(file.lastModified)}${previewHint}</small>
       <div class="match">${file.vaultFileId ? `VaultSage: ${file.vaultFileId.slice(0, 8)}` : (file.reasons.join("、") || t("noClue"))}</div>
-      <small>${extractionLabel(file)}</small>
+      ${selectHtml}
+      <small style="margin-top: 4px; display: block;">${extractionLabel(file)}</small>
     </article>
   `;
 }
 
 function bindPreviewClicks(container) {
+  // 1. 預覽點擊事件
   container.querySelectorAll(".file-item.is-previewable").forEach((item) => {
-    item.addEventListener("click", () => {
+    item.addEventListener("click", (e) => {
+      // 如果點擊的是下拉選單或手動分類區域，不要開啟預覽
+      if (e.target.closest(".reclassify-selector") || e.target.tagName === "SELECT" || e.target.tagName === "OPTION") {
+        return;
+      }
       const file = state.files.find((candidate) => candidate.id === item.dataset.fileId);
       if (file?.previewUrl) {
         openPreview(file);
+      }
+    });
+  });
+
+  // 2. 綁定手動重新分配科目的 change 事件
+  container.querySelectorAll(".move-course-select").forEach((select) => {
+    select.addEventListener("change", (e) => {
+      const fileId = select.dataset.fileId;
+      const newCourseId = select.value || null;
+      const file = state.files.find((f) => f.id === fileId);
+      if (file) {
+        file.courseId = newCourseId;
+        file.confidence = 100;
+        const matchedCourse = courseById(newCourseId);
+        
+        // 取得翻譯後的原因說明
+        if (matchedCourse) {
+          file.reasons = [fmt(t("manualReassignReason"), { course: matchedCourse.title })];
+        } else {
+          file.reasons = [t("manualReassignUnassigned")];
+        }
+        
+        // 🌟 獲取該卡片 DOM 元素並加上動畫類別
+        const cardDom = select.closest(".file-item");
+        if (cardDom) {
+          cardDom.classList.add("just-reassigned");
+        }
+        
+        // 延遲更新以完整展示動畫
+        setTimeout(() => {
+          render();
+          persistStateSoon();
+          if (state.selectedCourseId) {
+            renderCourseDetail();
+          }
+        }, 800);
       }
     });
   });
@@ -1395,13 +1473,26 @@ function renderFiles() {
 
   fileList.innerHTML = state.files.map((file) => {
     const course = courseById(file.courseId);
+    const selectHtml = `
+      <div class="reclassify-selector" style="margin-top: 8px; display: flex; align-items: center; gap: 6px;">
+        <span style="font-size: 0.8rem; opacity: 0.8; color: var(--ink);">${t("reclassifyLabel")}</span>
+        <select class="move-course-select" data-file-id="${file.id}" style="padding: 2px 6px; font-size: 0.8rem; border-radius: 4px; border: 1px solid var(--line); background: #fff; cursor: pointer; color: var(--ink);">
+          <option value="" ${!file.courseId ? "selected" : ""}>${t("unmatchedOption")}</option>
+          ${state.schedule.map(c => `
+            <option value="${c.id}" ${file.courseId === c.id ? "selected" : ""}>${c.title}</option>
+          `).join("")}
+        </select>
+      </div>
+    `;
+
     return `
       <article class="file-item type-${file.type} ${file.previewUrl ? "is-previewable" : ""}" data-file-id="${file.id}">
         ${file.type === "image" && file.previewUrl ? `<img class="file-thumb" src="${file.previewUrl}" alt="${file.name}">` : ""}
         <strong>${file.name}</strong>
         <small>${typeLabel(file.type)} / ${formatDate(file.lastModified)}${file.previewUrl ? t("previewHint") : ""}</small>
         <div class="match">${course ? `${t("matchedTo")}：${course.title}，${t("confidence")} ${file.confidence}%` : t("unmatched")}</div>
-        <small>${file.reasons.join("、") || t("noClue")} / ${file.vaultFileId ? `API: ${file.vaultFileId.slice(0, 8)}` : extractionLabel(file)}</small>
+        ${selectHtml}
+        <small style="margin-top: 4px; display: block;">${file.reasons.join("、") || t("noClue")} / ${file.vaultFileId ? `API: ${file.vaultFileId.slice(0, 8)}` : extractionLabel(file)}</small>
       </article>
     `;
   }).join("");
@@ -1800,7 +1891,12 @@ async function syncSelectedCourseToApi() {
   await syncFilesToApi(files);
 }
 
-document.querySelector("#pickFilesButton").addEventListener("click", () => fileInput.click());
+// 🌟 點擊整個上傳區域（含 + 號與文字空白處）都能觸發選擇檔案
+document.querySelector("#dropZone").addEventListener("click", (e) => {
+  // 避免重複點擊按鈕觸發二次
+  if (e.target.id === "pickFilesButton") return;
+  fileInput.click();
+});
 document.querySelectorAll(".lang-switcher button").forEach((button) => {
   button.addEventListener("click", () => setLanguage(button.dataset.lang));
 });
