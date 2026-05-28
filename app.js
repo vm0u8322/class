@@ -1707,6 +1707,7 @@ async function ensureCourseFileText(courseFiles, courseId) {
     && ["pending", "processing"].includes(file.uploadStatus)
   );
 
+  let lastMessageContent = "";
   while (hasPendingOrProcessing) {
     const runningFile = courseFiles.find((file) => 
       file.sourceFile 
@@ -1714,8 +1715,12 @@ async function ensureCourseFileText(courseFiles, courseId) {
       && ["pending", "processing"].includes(file.uploadStatus)
     );
     if (loadingMsg && runningFile) {
-      loadingMsg.content = `正在等候背景語音轉錄/檔案辨識佇列完成... ⏳\n(目前處理中：${runningFile.name})`;
-      renderChatHistory(courseId);
+      const newContent = `正在等候背景語音轉錄/檔案辨識佇列完成... ⏳\n(目前處理中：${runningFile.name})`;
+      if (newContent !== lastMessageContent) {
+        lastMessageContent = newContent;
+        loadingMsg.content = newContent;
+        renderChatHistory(courseId);
+      }
     }
     // 每 800ms 輪詢檢查一次狀態
     await new Promise((resolve) => setTimeout(resolve, 800));
