@@ -68,7 +68,7 @@ const translations = {
     checkApi: "重新檢查",
     apiPanelDefault: "正式部署模式：API key 由後端環境變數提供，前端不保存 key。",
     uploadTitle: "拖曳或點擊此處上傳講義、照片、錄音、筆記",
-    uploadDesc: "API 連線後，上傳檔案會先依課表分類，再建立課程資料夾並送進 VaultSage；本機分類只是斷線時的備援。（建議單一講義/照片/錄音限制於 20MB 內以確保最佳速度）",
+    uploadDesc: "拖曳上傳後將自動進行本機文字/語音辨識。請點擊檔案的「手動分配科」將其指派到對應課程，並於需要問答時手動點擊右側的「同步到 VaultSage」上傳即可。（單一檔案限 20MB 內）",
     pickFiles: "選擇檔案",
     queueTitle: "檔案佇列",
     clear: "清空",
@@ -126,7 +126,7 @@ const translations = {
     checkApi: "Check",
     apiPanelDefault: "Production mode: the API key is provided by backend environment variables.",
     uploadTitle: "Drag or click here to upload handouts, photos, recordings, notes",
-    uploadDesc: "After API connection, files are classified by timetable, organized into course folders, and synced to VaultSage. (Max 20MB per file recommended for best speed)",
+    uploadDesc: "Files are processed locally for text/speech extraction. Reassign them manually to courses, then click 'Sync to VaultSage' only when you need to sync for AI Q&A. (Max 20MB per file)",
     pickFiles: "Choose files",
     queueTitle: "File Queue",
     clear: "Clear",
@@ -184,7 +184,7 @@ const translations = {
     checkApi: "다시 확인",
     apiPanelDefault: "배포 모드: API key는 백엔드 환경 변수로 관리됩니다.",
     uploadTitle: "여기로 드래그하거나 클릭하여 자료, 사진, 녹음, 노트 업로드",
-    uploadDesc: "API 연결 후 파일은 시간표 기준으로 분류되고 VaultSage에 동기화됩니다 (최적의 성능을 위해 단일 파일 20MB 이하 권장).",
+    uploadDesc: "업로드한 파일은 로컬에서 즉시 텍스트/음성 인식 처리됩니다. 수동으로 과목을 지정한 후, 필요할 때 우측의 'VaultSage 동기화'를 눌러 업로드하세요 (단일 파일 20MB 이하 권장).",
     pickFiles: "파일 선택",
     queueTitle: "파일 대기열",
     clear: "비우기",
@@ -911,22 +911,16 @@ function classifyFile(fileLike) {
   const sourceFile = fileLike.sourceFile || (fileLike instanceof File ? fileLike : null);
   // 優先沿用已存在的 previewUrl，避免重複創建 Blob URL 造成 ERR_FILE_NOT_FOUND
   const previewUrl = fileLike.previewUrl || (type === "image" && sourceFile ? URL.createObjectURL(sourceFile) : null);
-  let best = { course: null, score: 0, reasons: [] };
-  for (const course of state.schedule) {
-    const result = scoreFileForCourse(fileLike, course);
-    if (result.score > best.score) {
-      best = { course, score: result.score, reasons: result.reasons };
-    }
-  }
+  
   return {
-    id: crypto.randomUUID(),
+    id: fileLike.id || crypto.randomUUID(),
     name: fileLike.name,
     size: fileLike.size || 0,
     lastModified: fileLike.lastModified || 0,
     type,
-    courseId: best.score > 0 ? best.course.id : null,
-    confidence: Math.min(99, best.score * 18),
-    reasons: best.reasons,
+    courseId: fileLike.courseId || null,
+    confidence: fileLike.confidence || 0,
+    reasons: fileLike.reasons || ["等待手動分配"],
     sourceFile,
     previewUrl,
     sourceText: fileLike.sourceText || "",
@@ -1211,18 +1205,6 @@ async function processFileTextBatch(filesToProcess, { syncAfter = true } = {}) {
 
       await enrichFileLike(file.sourceFile);
       file.sourceText = file.sourceFile.sourceText || "";
-
-      const reClassified = classifyFile({
-        name: file.name,
-        size: file.size,
-        lastModified: file.lastModified,
-        sourceFile: file.sourceFile,
-        sourceText: file.sourceText,
-      });
-
-      file.courseId = reClassified.courseId;
-      file.confidence = reClassified.confidence;
-      file.reasons = reClassified.reasons;
       file.uploadStatus = file.sourceText ? "local" : "failed";
       render();
     } catch (err) {
@@ -1239,23 +1221,6 @@ async function processFileTextBatch(filesToProcess, { syncAfter = true } = {}) {
     "OCR / text extraction finished: {total} file(s) processed, {extracted} with text, {missing} without text.",
     "OCR / 텍스트 추출 완료: {total}개 처리, {extracted}개 텍스트 추출, {missing}개 텍스트 없음."
   ), { total: targets.length, extracted: extractedCount, missing: missingTextCount }));
-
-  if (syncAfter && state.apiReady) {
-    (async () => {
-      try {
-        await classifyTextFilesByApi(targets);
-        render();
-      } catch (err) {
-        console.warn("API classification failed for batch:", err);
-      }
-      try {
-        await syncFilesToApi(targets);
-        render();
-      } catch (err) {
-        console.warn("API sync failed for batch:", err);
-      }
-    })();
-  }
 }
 
 function queueTextProcessing(filesToProcess, options) {
