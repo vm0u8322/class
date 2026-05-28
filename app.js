@@ -75,7 +75,7 @@ const translations = {
     currentCourse: "目前課程",
     noCourseTitle: "請點一堂課",
     noCourseMeta: "選擇課表中的課程後，這裡會整理相關講義、照片、錄音與筆記。",
-    downloadZip: "下載照片與錄音 ZIP",
+    downloadZip: "下載所有檔案 ZIP",
     syncCourse: "同步到 VaultSage",
     questionPlaceholder: "問這堂課：期中重點是什麼？",
     ask: "整理",
@@ -133,7 +133,7 @@ const translations = {
     currentCourse: "Current Course",
     noCourseTitle: "Select a course",
     noCourseMeta: "After selecting a course, related handouts, photos, recordings, and notes appear here.",
-    downloadZip: "Download Photos & Audio ZIP",
+    downloadZip: "Download All Files ZIP",
     syncCourse: "Sync to VaultSage",
     questionPlaceholder: "Ask this course: What matters for midterm?",
     ask: "Organize",
@@ -191,7 +191,7 @@ const translations = {
     currentCourse: "현재 수업",
     noCourseTitle: "수업을 선택하세요",
     noCourseMeta: "수업을 선택하면 관련 자료, 사진, 녹음, 노트가 여기에 정리됩니다.",
-    downloadZip: "사진/녹음 ZIP 다운로드",
+    downloadZip: "모든 파일 ZIP 다운로드",
     syncCourse: "VaultSage 동기화",
     questionPlaceholder: "이 수업 질문: 중간고사 핵심은?",
     ask: "정리",
@@ -1118,32 +1118,43 @@ async function createZipBlob(entries) {
 async function downloadSelectedCourseMediaZip() {
   const course = courseById(state.selectedCourseId);
   if (!course) {
-    answerBox.textContent = "請先建立課表並選擇一門課，再下載該課程的照片與錄音。";
+    answerBox.textContent = "請先建立課表並選擇一門課，再下載該課程的檔案。";
     return;
   }
-  const mediaFiles = state.files.filter((file) => (
+  const courseFilesList = state.files.filter((file) => (
     file.courseId === course.id
-    && (file.type === "image" || file.type === "audio")
     && file.sourceFile
   ));
-  if (!mediaFiles.length) {
-    answerBox.textContent = "這堂課沒有可打包的本機照片或錄音。示範檔沒有實際檔案內容，請拖入真實檔案後再下載。";
+  if (!courseFilesList.length) {
+    answerBox.textContent = "這堂課目前沒有本機檔案可以打包。請上傳真實檔案後再下載。";
     return;
   }
 
-  answerBox.textContent = `正在打包「${course.title}」的 ${mediaFiles.length} 個照片/錄音檔...`;
-  const entries = mediaFiles.map((file) => ({
-    path: `${file.type === "image" ? "photos" : "audio"}/${sanitizeZipName(file.name)}`,
-    file: file.sourceFile,
-  }));
+  answerBox.textContent = `正在打包「${course.title}」的 ${courseFilesList.length} 個檔案...`;
+  
+  // 建立分類資料夾對照：講義(handouts), 圖片(photos), 錄音(audio), 筆記(notes)
+  const typeSubfolders = {
+    document: "handouts",
+    image: "photos",
+    audio: "audio",
+    note: "notes"
+  };
+
+  const entries = courseFilesList.map((file) => {
+    const subfolder = typeSubfolders[file.type] || "others";
+    return {
+      path: `${subfolder}/${sanitizeZipName(file.name)}`,
+      file: file.sourceFile,
+    };
+  });
   const zip = await createZipBlob(entries);
   const url = URL.createObjectURL(zip);
   const link = document.createElement("a");
   link.href = url;
-  link.download = `${sanitizeZipName(course.title)}_photos_audio.zip`;
+  link.download = `${sanitizeZipName(course.title)}_all_files.zip`;
   link.click();
   URL.revokeObjectURL(url);
-  answerBox.textContent = `已下載「${course.title}」照片與錄音 ZIP。`;
+  answerBox.textContent = `已下載「${course.title}」所有檔案 ZIP。`;
 }
 
 function releaseFilePreviews(files = state.files) {
