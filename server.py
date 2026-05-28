@@ -1,7 +1,10 @@
 import base64
+import json
 import os
 os.environ["FLAGS_use_onednn"] = "0"
 os.environ["FLAGS_use_mkldnn"] = "0"
+import subprocess
+import sys
 import tempfile
 from io import BytesIO
 from pathlib import Path
@@ -117,40 +120,48 @@ def get_whisper():
     return _whisper_model
 
 def run_ocr_on_pil(pil_img: Image.Image) -> str:
-    # ⚡ 速度優化：縮小圖片並直接在進程內辨識，避免每次重新讀取模型（速度提升 10 倍以上）
+    # Run OCR in a subprocess so PaddleOCR API changes do not break the web server.
     max_size = 1000
     if max(pil_img.size) > max_size:
         pil_img = pil_img.copy()
         pil_img.thumbnail((max_size, max_size), Image.Resampling.LANCZOS)
         print(f"Resized image to {pil_img.size} for fast CPU OCR")
 
-    model = get_ocr()
-    if not model:
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as tmp:
+        tmp_path = tmp.name
+    try:
+        pil_img.convert("RGB").save(tmp_path, format="PNG")
+        result = subprocess.run(
+            [sys.executable, str(ROOT / "ocr_helper.py"), tmp_path],
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=90,
+        )
+        for line in reversed((result.stdout or "").strip().splitlines()):
+            try:
+                payload = json.loads(line)
+                if payload.get("error"):
+                    print(f"OCR helper error: {payload['error']}")
+                return str(payload.get("text") or "").strip()
+            except json.JSONDecodeError:
+                continue
+        if result.stderr:
+            print(f"OCR helper stderr: {result.stderr[-1000:]}")
         return ""
-
-    with _ocr_lock:
+    except Exception as e:
+        print(f"OCR helper failed: {e}")
+        return ""
+    finally:
         try:
-            img_np = np.array(pil_img.convert("RGB"))
-            img_cv2 = cv2.cvtColor(img_np, cv2.COLOR_RGB2BGR)
-            result = model.ocr(img_cv2, cls=False)
-            
-            if not result or not result[0]:
-                return ""
-                
-            texts = []
-            for line in result[0]:
-                if line and len(line) > 1:
-                    texts.append(line[1][0])
-            return " ".join(texts)
-        except Exception as e:
-            print(f"OCR 執行出錯: {e}")
-            return ""
+            Path(tmp_path).unlink(missing_ok=True)
+        except Exception:
+            pass
 
 def extract_pdf_ocr(body: bytes) -> str:
     ocr_texts = []
     try:
-        if get_ocr() is None:
-            return "【雲端伺服器提示：本機圖片 OCR 辨識功能未啟動。請點選同步直接使用 VaultSage 雲端整理服務。】"
         pdf = pdfium.PdfDocument(body)
         # OCR only first 3 pages to be fast
         for i in range(min(3, len(pdf))):

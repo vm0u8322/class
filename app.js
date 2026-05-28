@@ -223,6 +223,14 @@ function t(key) {
   return translations[currentLang]?.[key] || translations.zh[key] || key;
 }
 
+function tt(zh, en, ko) {
+  return currentLang === "en" ? en : currentLang === "ko" ? ko : zh;
+}
+
+function fmt(template, values = {}) {
+  return template.replace(/\{(\w+)\}/g, (_, key) => values[key] ?? "");
+}
+
 function answerLanguageName() {
   return currentLang === "en" ? "English" : currentLang === "ko" ? "Korean" : "繁體中文";
 }
@@ -446,8 +454,16 @@ async function restoreState() {
         sourceText: meta.sourceText || record?.sourceText || "",
       };
     });
-    scheduleStatus.textContent = "已還原上次的課表與檔案。";
-    answerBox.textContent = "資料已從本機還原；按「重新開始」才會清空。";
+    scheduleStatus.textContent = tt(
+      "已還原上次的課表與檔案。",
+      "Restored the previous timetable and files.",
+      "이전 시간표와 파일을 복원했습니다."
+    );
+    answerBox.textContent = tt(
+      "資料已從本機還原；按「重新開始」才會清空。",
+      "Local data restored. Use Reset to clear everything.",
+      "로컬 데이터를 복원했습니다. 모두 지우려면 처음부터를 누르세요."
+    );
   } finally {
     isRestoring = false;
   }
@@ -692,43 +708,61 @@ function setSchedule(courses, message) {
 function applyLocalScheduleText() {
   const text = scheduleTextInput.value.trim();
   if (!text) {
-    answerBox.textContent = "請先貼上或打字輸入課表。";
-    scheduleStatus.textContent = "請先貼上或打字輸入課表。";
+    const message = tt("請先貼上或打字輸入課表。", "Paste or type a timetable first.", "먼저 시간표를 붙여넣거나 입력하세요.");
+    answerBox.textContent = message;
+    scheduleStatus.textContent = message;
     return;
   }
   const parsed = parseScheduleText(text);
   if (!parsed.length) {
-    answerBox.textContent = "本機備援看不懂這份課表。請用類似「週一 09:10-12:00 統計學 B302 關鍵字: 回歸, anova」的格式。";
-    scheduleStatus.textContent = "本機備援解析失敗。";
+    answerBox.textContent = tt(
+      "本機備援看不懂這份課表。請用類似「週一 09:10-12:00 統計學 B302 關鍵字: 回歸, anova」的格式。",
+      "The local fallback could not understand this timetable. Try: Mon 09:10-12:00 Statistics B302 keywords: regression, anova.",
+      "로컬 보조 분석으로 이 시간표를 이해하지 못했습니다. 예: 월 09:10-12:00 통계학 B302 키워드: 회귀, anova"
+    );
+    scheduleStatus.textContent = tt("本機備援解析失敗。", "Local fallback parsing failed.", "로컬 보조 분석에 실패했습니다.");
     return;
   }
-  setSchedule(parsed, `已用本機規則讀懂 ${parsed.length} 堂課，並重新配對目前檔案。`);
+  setSchedule(parsed, fmt(tt(
+    "已用本機規則讀懂 {count} 堂課，並重新配對目前檔案。",
+    "Local rules parsed {count} course(s) and rematched current files.",
+    "로컬 규칙으로 {count}개 과목을 읽고 현재 파일을 다시 매칭했습니다."
+  ), { count: parsed.length }));
 }
 
 async function applyScheduleText() {
   const button = document.querySelector("#applyScheduleButton");
   const text = scheduleTextInput.value.trim();
   if (!text) {
-    answerBox.textContent = "請先貼上或打字輸入課表。";
-    scheduleStatus.textContent = "請先貼上或打字輸入課表。";
+    const message = tt("請先貼上或打字輸入課表。", "Paste or type a timetable first.", "먼저 시간표를 붙여넣거나 입력하세요.");
+    answerBox.textContent = message;
+    scheduleStatus.textContent = message;
     return;
   }
   if (!state.apiReady) {
-    answerBox.textContent = "API 尚未連線，所以這次沒有用 AI。請確認後端 .env 或部署平台環境變數已設定 VAULTSAGE_API_KEY。";
-    scheduleStatus.textContent = "API 未連線：AI 解析沒有執行。";
+    answerBox.textContent = tt(
+      "API 尚未連線，所以這次沒有用 AI。請確認後端 .env 或部署平台環境變數已設定 VAULTSAGE_API_KEY。",
+      "API is not connected, so AI parsing did not run. Check the backend .env or deployment variable VAULTSAGE_API_KEY.",
+      "API가 연결되지 않아 AI 분석을 실행하지 않았습니다. 백엔드 .env 또는 배포 환경 변수 VAULTSAGE_API_KEY를 확인하세요."
+    );
+    scheduleStatus.textContent = tt("API 未連線：AI 解析沒有執行。", "API offline: AI parsing did not run.", "API 오프라인: AI 분석을 실행하지 않았습니다.");
     return;
   }
 
   const cached = getCachedSchedule(text);
   if (cached?.length) {
-    setSchedule(cached, `已使用快取課表，讀懂 ${cached.length} 堂課。`);
+    setSchedule(cached, fmt(tt(
+      "已使用快取課表，讀懂 {count} 堂課。",
+      "Used cached timetable and parsed {count} course(s).",
+      "캐시된 시간표를 사용해 {count}개 과목을 읽었습니다."
+    ), { count: cached.length }));
     return;
   }
 
   button.disabled = true;
-  button.textContent = "解析中...";
-  scheduleStatus.textContent = "正在用 VaultSage API 解析課表...";
-  answerBox.textContent = "正在用 VaultSage API 解析課表文字...";
+  button.textContent = tt("解析中...", "Parsing...", "분석 중...");
+  scheduleStatus.textContent = tt("正在用 VaultSage API 解析課表...", "Parsing timetable with VaultSage API...", "VaultSage API로 시간표를 분석하는 중...");
+  answerBox.textContent = tt("正在用 VaultSage API 解析課表文字...", "Reading timetable text with VaultSage API...", "VaultSage API로 시간표 텍스트를 읽는 중...");
   try {
     const result = await apiFetch("/api/chat", {
       method: "POST",
@@ -740,17 +774,21 @@ async function applyScheduleText() {
     });
     const apiCourses = normalizeParsedCourses(extractJson(result.answer), text);
     if (apiCourses.length) {
-      setSchedule(apiCourses, `API 已讀懂 ${apiCourses.length} 堂課，並重新配對目前檔案。`);
+      setSchedule(apiCourses, fmt(tt(
+        "API 已讀懂 {count} 堂課，並重新配對目前檔案。",
+        "API parsed {count} course(s) and rematched current files.",
+        "API가 {count}개 과목을 읽고 현재 파일을 다시 매칭했습니다."
+      ), { count: apiCourses.length }));
       return;
     }
-    answerBox.textContent = "API 有回覆，但不是可用 JSON；沒有套用本機規則。";
-    scheduleStatus.textContent = "API 回覆無法轉成課表。";
+    answerBox.textContent = tt("API 有回覆，但不是可用 JSON；沒有套用本機規則。", "The API responded, but it was not usable JSON. Local rules were not applied.", "API 응답이 있었지만 사용할 수 있는 JSON이 아닙니다. 로컬 규칙은 적용하지 않았습니다.");
+    scheduleStatus.textContent = tt("API 回覆無法轉成課表。", "The API response could not be converted into a timetable.", "API 응답을 시간표로 변환할 수 없습니다.");
   } catch (error) {
-    answerBox.textContent = `API 課表解析失敗：${error.message}`;
-    scheduleStatus.textContent = "API 解析失敗，請檢查 key 或 API 狀態。";
+    answerBox.textContent = fmt(tt("API 課表解析失敗：{error}", "API timetable parsing failed: {error}", "API 시간표 분석 실패: {error}"), { error: error.message });
+    scheduleStatus.textContent = tt("API 解析失敗，請檢查 key 或 API 狀態。", "API parsing failed. Check the key or API status.", "API 분석 실패. key 또는 API 상태를 확인하세요.");
   } finally {
     button.disabled = false;
-    button.textContent = "AI 解析課表";
+    button.textContent = t("parseSchedule");
   }
 }
 
@@ -1136,7 +1174,15 @@ async function addFiles(files) {
     }
   }
 
-  showBackgroundStatus(`佇列中的 ${newFiles.length} 個檔案已全部完成背景分析與同步！`);
+  const extractedCount = newFiles.filter((file) => file.sourceText).length;
+  const missingTextCount = newFiles.filter((file) => (
+    ["image", "document", "audio", "note"].includes(file.type) && !file.sourceText
+  )).length;
+  showBackgroundStatus(fmt(tt(
+    "背景處理完成：{total} 個檔案跑完，{extracted} 個讀到文字，{missing} 個未讀到文字。",
+    "Background processing finished: {total} file(s) processed, {extracted} with extracted text, {missing} without text.",
+    "백그라운드 처리 완료: {total}개 파일 처리, {extracted}개 텍스트 추출, {missing}개 텍스트 없음."
+  ), { total: newFiles.length, extracted: extractedCount, missing: missingTextCount }));
 }
 
 async function loadSampleCourseDocs() {
