@@ -1526,7 +1526,6 @@ async function ensureCourseFileText(courseFiles, courseId) {
   const needsText = courseFiles.filter((file) => (
     file.sourceFile
     && !file.sourceText
-    && file.uploadStatus !== "failed"
     && ["image", "document", "audio", "note"].includes(file.type)
   ));
   if (!needsText.length) return;
