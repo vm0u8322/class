@@ -75,7 +75,7 @@ const translations = {
     noCourseTitle: "請點一堂課",
     noCourseMeta: "選擇課表中的課程後，這裡會整理相關講義、照片、錄音與筆記。",
     downloadZip: "下載照片與錄音 ZIP",
-    syncCourse: "重新同步這堂課",
+    syncCourse: "同步到 VaultSage",
     questionPlaceholder: "問這堂課：期中重點是什麼？",
     ask: "整理",
     copy: "複製",
@@ -125,7 +125,7 @@ const translations = {
     noCourseTitle: "Select a course",
     noCourseMeta: "After selecting a course, related handouts, photos, recordings, and notes appear here.",
     downloadZip: "Download Photos & Audio ZIP",
-    syncCourse: "Sync this course again",
+    syncCourse: "Sync to VaultSage",
     questionPlaceholder: "Ask this course: What matters for midterm?",
     ask: "Organize",
     copy: "Copy",
@@ -175,7 +175,7 @@ const translations = {
     noCourseTitle: "수업을 선택하세요",
     noCourseMeta: "수업을 선택하면 관련 자료, 사진, 녹음, 노트가 여기에 정리됩니다.",
     downloadZip: "사진/녹음 ZIP 다운로드",
-    syncCourse: "이 수업 다시 동기화",
+    syncCourse: "VaultSage 동기화",
     questionPlaceholder: "이 수업 질문: 중간고사 핵심은?",
     ask: "정리",
     copy: "복사",
@@ -869,7 +869,7 @@ function fileCardHtml(file) {
       ${preview}
       <strong>${file.name}</strong>
       <small>${typeLabel(file.type)} / ${formatDate(file.lastModified)}${previewHint}</small>
-      <div class="match">${file.vaultFileId ? `API: ${file.vaultFileId.slice(0, 8)}` : (file.reasons.join("、") || t("noClue"))}</div>
+      <div class="match">${file.vaultFileId ? `VaultSage: ${file.vaultFileId.slice(0, 8)}` : (file.reasons.join("、") || t("noClue"))}</div>
     </article>
   `;
 }
@@ -1556,11 +1556,20 @@ async function syncFilesToApi(files) {
 
   const realFiles = files.filter((file) => file.courseId && file.sourceFile && !file.vaultFileId);
   if (!realFiles.length) {
-    answerBox.textContent = "示範檔沒有真實檔案內容可上傳；請拖入你電腦上的實際檔案。";
+    const alreadySynced = files.filter((file) => file.vaultFileId).length;
+    const hasSourceFiles = files.some((file) => file.sourceFile);
+    if (alreadySynced) {
+      showBackgroundStatus(`這堂課已有 ${alreadySynced} 份檔案同步到 VaultSage。`);
+    } else if (!hasSourceFiles) {
+      answerBox.textContent = "目前這堂課沒有可上傳的原始檔案。請重新上傳真實檔案後再同步到 VaultSage。";
+    } else {
+      answerBox.textContent = "目前檔案尚未配對到課程，請先確認課表與檔案時間/內容配對成功。";
+    }
     return;
   }
 
   showBackgroundStatus(`API 主流程：正在依課表建立資料夾並上傳 ${realFiles.length} 份檔案...`);
+  const uploadedNames = [];
   try {
     const grouped = new Map();
     for (const file of realFiles) {
@@ -1619,11 +1628,14 @@ async function syncFilesToApi(files) {
         const uploaded = await apiFetch(`/api/upload?directory_id=${encodeURIComponent(directoryId)}`, { method: "POST", body: form });
         file.vaultFileId = uploaded.file_id;
         file.uploadStatus = "api";
+        uploadedNames.push(`${file.name} (${uploaded.file_id.slice(0, 8)})`);
+        showBackgroundStatus(`已上傳到 VaultSage：${file.name} (${uploaded.file_id.slice(0, 8)})`);
       }
     }
-    showBackgroundStatus("已完成 API 主流程：檔案已依課程資料夾送進 VaultSage。");
+    showBackgroundStatus(`已完成 VaultSage 同步：${uploadedNames.length} 份檔案。`);
   } catch (error) {
     showBackgroundStatus(`同步失敗：${error.message}`);
+    answerBox.textContent = `VaultSage 同步失敗：${error.message}`;
   }
   render();
 }

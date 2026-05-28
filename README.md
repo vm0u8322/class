@@ -119,6 +119,56 @@ MochiClass 是一個以 **VaultSage API** 為核心的學生課堂檔案整理�
 * 第六節 14:25-15:15｜資訊管理實務專題二｜吳柏霖｜夢想工廠 000
 ```
 
+### English Timetable Example
+
+You can also paste an English-style timetable. MochiClass will still use VaultSage API to parse the text into structured course blocks.
+
+```text
+Spring Semester Timetable
+
+Monday
+
+* Period 3 10:10-11:00 | English Communication | Grace Wang | Sky Garden 101
+* Period 4 11:10-12:00 | English Communication | Grace Wang | Sky Garden 101
+* Period 5 13:30-14:20 | Database Systems Lab | Brian Lin | Cloud Base A1
+* Period 6 14:25-15:15 | Database Systems Lab | Brian Lin | Cloud Base A1
+* Period 7 15:25-16:15 | Database Systems Lab | Brian Lin | Cloud Base A1
+
+Tuesday
+
+* Period 2 09:10-10:00 | Applied Statistics | Carter Chen | Data Tower 202
+* Period 3 10:10-11:00 | Applied Statistics | Carter Chen | Data Tower 202
+* Period 4 11:10-12:00 | Applied Statistics | Carter Chen | Data Tower 202
+* Period 5 13:30-14:20 | Machine Learning and Deep Learning | Howard Hsu | Matrix Room 404
+* Period 6 14:25-15:15 | Machine Learning and Deep Learning | Howard Hsu | Matrix Room 404
+* Period 7 15:25-16:15 | Machine Learning and Deep Learning | Howard Hsu | Matrix Room 404
+
+Wednesday
+
+* Period 1 08:10-09:00 | Smart Engineering and Modern Technology | Victor Chang | Evolution Lab 99
+* Period 2 09:10-10:00 | Smart Engineering and Modern Technology | Victor Chang | Evolution Lab 99
+* Period 5 13:30-14:20 | E-commerce and Digital Marketing | Ethan Lee | Virtual Market 701
+* Period 6 14:25-15:15 | E-commerce and Digital Marketing | Ethan Lee | Virtual Market 701
+* Period 7 15:25-16:15 | E-commerce and Digital Marketing | Ethan Lee | Virtual Market 701
+
+Thursday
+
+* Period 2 09:10-10:00 | Mobile App Development | Shawn Huang | Open Source Field 001
+* Period 3 10:10-11:00 | Mobile App Development | Shawn Huang | Open Source Field 001
+* Period 4 11:10-12:00 | Mobile App Development | Shawn Huang | Open Source Field 001
+* Period 5 13:30-14:20 | Computer Networks | Ben Chou | Switch Room 502
+* Period 6 14:25-15:15 | Computer Networks | Ben Chou | Switch Room 502
+* Period 7 15:25-16:15 | Computer Networks | Ben Chou | Switch Room 502
+
+Friday
+
+* Period 2 09:10-10:00 | Linux Systems | Eric Tsai | Kernel Terminal 604
+* Period 3 10:10-11:00 | Linux Systems | Eric Tsai | Kernel Terminal 604
+* Period 4 11:10-12:00 | Linux Systems | Eric Tsai | Kernel Terminal 604
+* Period 5 13:30-14:20 | Information Management Capstone II | William Wu | Dream Factory 000
+* Period 6 14:25-15:15 | Information Management Capstone II | William Wu | Dream Factory 000
+```
+
 ## 本機執行環境要求
 
 ```powershell
