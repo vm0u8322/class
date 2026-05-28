@@ -95,6 +95,32 @@ h2 {
   flex-wrap: wrap;
 }
 
+.lang-switcher {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: #fff;
+}
+
+.lang-switcher button {
+  min-height: 0;
+  padding: 4px 8px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 900;
+}
+
+.lang-switcher button.active {
+  background: var(--ink);
+  color: #fff;
+}
+
 .status-strip span {
   border: 1px solid var(--line);
   border-radius: 999px;
@@ -580,8 +606,12 @@ h2 {
     display: none;
   }
 
-  .status-strip button:not(#resetAllButton) {
+  .status-strip > button:not(#resetAllButton) {
     display: none;
+  }
+
+  .lang-switcher {
+    width: fit-content;
   }
 
   .panel-head,

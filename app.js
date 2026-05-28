@@ -52,6 +52,224 @@ let isRestoring = false;
 let activeView = "schedule";
 
 const defaultScheduleText = "";
+const LANG_KEY = "mochiclass-lang";
+const translations = {
+  zh: {
+    tagline: "API-first class file manager",
+    reset: "重新開始",
+    scheduleView: "課表",
+    filesView: "上傳與佇列",
+    courseView: "課程內容",
+    scheduleTitle: "課表",
+    parseSchedule: "AI 解析課表",
+    scheduleReady: "可直接貼上整段課表，按「AI 解析課表」。",
+    apiTitle: "VaultSage API 主連線",
+    checkApi: "重新檢查",
+    apiPanelDefault: "正式部署模式：API key 由後端環境變數提供，前端不保存 key。",
+    uploadTitle: "上傳講義、照片、錄音、筆記",
+    uploadDesc: "API 連線後，上傳檔案會先依課表分類，再建立課程資料夾並送進 VaultSage；本機分類只是斷線時的備援。",
+    pickFiles: "選擇檔案",
+    queueTitle: "檔案佇列",
+    clear: "清空",
+    currentCourse: "目前課程",
+    noCourseTitle: "請點一堂課",
+    noCourseMeta: "選擇課表中的課程後，這裡會整理相關講義、照片、錄音與筆記。",
+    downloadZip: "下載照片與錄音 ZIP",
+    syncCourse: "重新同步這堂課",
+    questionPlaceholder: "問這堂課：期中重點是什麼？",
+    ask: "整理",
+    copy: "複製",
+    answerDefault: "主流程是 API：課表負責分類，VaultSage 負責保存、檢索與問答；本機只保留分類狀態和展示備援。",
+    all: "全部",
+    document: "講義",
+    image: "照片",
+    audio: "錄音",
+    note: "筆記",
+    apiDisconnected: "API 未連線",
+    apiConnected: "API 已連線",
+    workIdle: "背景待命",
+    files: "files",
+    matched: "matched",
+    noSchedule: "請先貼上或輸入課表，再按「AI 解析課表」。",
+    noFiles: "還沒有檔案。請上傳你的講義、照片、錄音或筆記。",
+    previewHint: " / 點擊預覽",
+    matchedTo: "配到",
+    confidence: "信心",
+    unmatched: "尚未配到課程",
+    noClue: "沒有明顯關鍵字或時間線索",
+    noSelectedCourse: "目前沒有選取課程。",
+    emptyCategory: "這個分類目前沒有資料。",
+    dataCount: "份資料",
+    progressEmpty: "尚未上傳資料",
+    progressWorking: "辨識進度",
+    progressDone: "辨識完成",
+  },
+  en: {
+    tagline: "API-first class file manager",
+    reset: "Reset",
+    scheduleView: "Schedule",
+    filesView: "Uploads",
+    courseView: "Course",
+    scheduleTitle: "Schedule",
+    parseSchedule: "AI Parse",
+    scheduleReady: "Paste your timetable, then click AI Parse.",
+    apiTitle: "VaultSage API",
+    checkApi: "Check",
+    apiPanelDefault: "Production mode: the API key is provided by backend environment variables.",
+    uploadTitle: "Upload handouts, photos, recordings, notes",
+    uploadDesc: "After API connection, files are classified by timetable, organized into course folders, and synced to VaultSage.",
+    pickFiles: "Choose files",
+    queueTitle: "File Queue",
+    clear: "Clear",
+    currentCourse: "Current Course",
+    noCourseTitle: "Select a course",
+    noCourseMeta: "After selecting a course, related handouts, photos, recordings, and notes appear here.",
+    downloadZip: "Download Photos & Audio ZIP",
+    syncCourse: "Sync this course again",
+    questionPlaceholder: "Ask this course: What matters for midterm?",
+    ask: "Organize",
+    copy: "Copy",
+    answerDefault: "API-first flow: the timetable classifies files, VaultSage stores, retrieves, and answers; local state is used for fallback.",
+    all: "All",
+    document: "Handouts",
+    image: "Photos",
+    audio: "Recordings",
+    note: "Notes",
+    apiDisconnected: "API offline",
+    apiConnected: "API connected",
+    workIdle: "Idle",
+    files: "files",
+    matched: "matched",
+    noSchedule: "Paste or type a timetable, then click AI Parse.",
+    noFiles: "No files yet. Upload handouts, photos, recordings, or notes.",
+    previewHint: " / preview",
+    matchedTo: "Matched",
+    confidence: "confidence",
+    unmatched: "Not matched yet",
+    noClue: "No clear keyword or time clue",
+    noSelectedCourse: "No course selected.",
+    emptyCategory: "No files in this category.",
+    dataCount: "files",
+    progressEmpty: "No files yet",
+    progressWorking: "Processing",
+    progressDone: "Done",
+  },
+  ko: {
+    tagline: "API 우선 수업 파일 관리자",
+    reset: "처음부터",
+    scheduleView: "시간표",
+    filesView: "업로드",
+    courseView: "수업 내용",
+    scheduleTitle: "시간표",
+    parseSchedule: "AI 시간표 분석",
+    scheduleReady: "시간표를 붙여넣고 AI 시간표 분석을 누르세요.",
+    apiTitle: "VaultSage API 연결",
+    checkApi: "다시 확인",
+    apiPanelDefault: "배포 모드: API key는 백엔드 환경 변수로 관리됩니다.",
+    uploadTitle: "자료, 사진, 녹음, 노트 업로드",
+    uploadDesc: "API 연결 후 파일은 시간표 기준으로 분류되고 VaultSage의 수업 폴더에 동기화됩니다.",
+    pickFiles: "파일 선택",
+    queueTitle: "파일 대기열",
+    clear: "비우기",
+    currentCourse: "현재 수업",
+    noCourseTitle: "수업을 선택하세요",
+    noCourseMeta: "수업을 선택하면 관련 자료, 사진, 녹음, 노트가 여기에 정리됩니다.",
+    downloadZip: "사진/녹음 ZIP 다운로드",
+    syncCourse: "이 수업 다시 동기화",
+    questionPlaceholder: "이 수업 질문: 중간고사 핵심은?",
+    ask: "정리",
+    copy: "복사",
+    answerDefault: "API 중심 흐름: 시간표로 파일을 분류하고 VaultSage가 저장, 검색, 질의응답을 담당합니다.",
+    all: "전체",
+    document: "자료",
+    image: "사진",
+    audio: "녹음",
+    note: "노트",
+    apiDisconnected: "API 미연결",
+    apiConnected: "API 연결됨",
+    workIdle: "대기 중",
+    files: "files",
+    matched: "matched",
+    noSchedule: "시간표를 입력한 뒤 AI 시간표 분석을 누르세요.",
+    noFiles: "아직 파일이 없습니다. 자료, 사진, 녹음 또는 노트를 업로드하세요.",
+    previewHint: " / 미리보기",
+    matchedTo: "분류",
+    confidence: "신뢰도",
+    unmatched: "아직 분류되지 않음",
+    noClue: "명확한 키워드나 시간 단서 없음",
+    noSelectedCourse: "선택된 수업이 없습니다.",
+    emptyCategory: "이 분류에는 자료가 없습니다.",
+    dataCount: "개 자료",
+    progressEmpty: "자료 없음",
+    progressWorking: "처리 중",
+    progressDone: "완료",
+  },
+};
+let currentLang = localStorage.getItem(LANG_KEY) || "zh";
+
+function t(key) {
+  return translations[currentLang]?.[key] || translations.zh[key] || key;
+}
+
+function answerLanguageName() {
+  return currentLang === "en" ? "English" : currentLang === "ko" ? "Korean" : "繁體中文";
+}
+
+function setText(selector, text) {
+  const el = document.querySelector(selector);
+  if (el) el.textContent = text;
+}
+
+function applyTranslations() {
+  document.documentElement.lang = currentLang === "zh" ? "zh-Hant" : currentLang;
+  setText("#appTagline", t("tagline"));
+  setText("#resetAllButton", t("reset"));
+  setText('[data-view="schedule"]', t("scheduleView"));
+  setText('[data-view="files"]', t("filesView"));
+  setText('[data-view="course"]', t("courseView"));
+  setText(".left-panel .panel-head h2", t("scheduleTitle"));
+  setText("#applyScheduleButton", t("parseSchedule"));
+  setText(".api-panel h2", t("apiTitle"));
+  setText("#checkApiButton", t("checkApi"));
+  setText("#dropZone h2", t("uploadTitle"));
+  setText("#dropZone p", t("uploadDesc"));
+  setText("#pickFilesButton", t("pickFiles"));
+  setText(".center-panel .panel-head.compact h2", t("queueTitle"));
+  setText("#clearButton", t("clear"));
+  setText(".course-card .eyebrow", t("currentCourse"));
+  setText("#downloadMediaButton", t("downloadZip"));
+  setText("#syncCourseButton", t("syncCourse"));
+  setText("#askForm button", t("ask"));
+  setText("#copyAnswerButton", `📋 ${t("copy")}`);
+  const questionInput = document.querySelector("#questionInput");
+  if (questionInput) questionInput.placeholder = t("questionPlaceholder");
+  const tabLabels = { all: "all", document: "document", image: "image", audio: "audio", note: "note" };
+  document.querySelectorAll(".tab").forEach((tab) => {
+    tab.textContent = t(tabLabels[tab.dataset.type] || tab.dataset.type);
+  });
+  document.querySelectorAll(".lang-switcher button").forEach((button) => {
+    button.classList.toggle("active", button.dataset.lang === currentLang);
+  });
+  if (!state.schedule.length) scheduleStatus.textContent = t("scheduleReady");
+  if (!state.selectedCourseId) {
+    courseTitle.textContent = state.schedule.length ? t("noCourseTitle") : t("noCourseTitle");
+    courseMeta.textContent = t("noCourseMeta");
+  }
+  if (answerBox.textContent.includes("主流程是 API") || answerBox.textContent.includes("API-first flow") || answerBox.textContent.includes("API 중심")) {
+    answerBox.textContent = t("answerDefault");
+  }
+  if (workStatus && ["背景待命", "Idle", "대기 중"].includes(workStatus.textContent.trim())) {
+    workStatus.textContent = t("workIdle");
+  }
+  renderStats();
+}
+
+function setLanguage(lang) {
+  currentLang = translations[lang] ? lang : "zh";
+  localStorage.setItem(LANG_KEY, currentLang);
+  applyTranslations();
+  render();
+}
 
 function makeDate(date, time) {
   return new Date(`${date}T${time}:00+08:00`).getTime();
@@ -645,13 +863,13 @@ function fileCardHtml(file) {
   const preview = file.type === "image" && file.previewUrl
     ? `<img class="file-thumb" src="${file.previewUrl}" alt="${file.name}">`
     : "";
-  const previewHint = file.type === "image" && file.previewUrl ? " / 點擊預覽" : "";
+  const previewHint = file.type === "image" && file.previewUrl ? t("previewHint") : "";
   return `
     <article class="file-item type-${file.type} ${file.previewUrl ? "is-previewable" : ""}" data-file-id="${file.id}">
       ${preview}
       <strong>${file.name}</strong>
       <small>${typeLabel(file.type)} / ${formatDate(file.lastModified)}${previewHint}</small>
-      <div class="match">${file.vaultFileId ? `已同步 API：${file.vaultFileId.slice(0, 8)}` : file.reasons.join("、")}</div>
+      <div class="match">${file.vaultFileId ? `API: ${file.vaultFileId.slice(0, 8)}` : (file.reasons.join("、") || t("noClue"))}</div>
     </article>
   `;
 }
@@ -938,16 +1156,16 @@ function courseById(id) {
 
 function typeLabel(type) {
   return {
-    document: "講義",
-    image: "照片",
-    audio: "錄音",
-    note: "筆記",
-  }[type] || "檔案";
+    document: t("document"),
+    image: t("image"),
+    audio: t("audio"),
+    note: t("note"),
+  }[type] || "File";
 }
 
 function courseProgress(files) {
   if (!files.length) {
-    return { total: 0, done: 0, percent: 0, label: "尚未上傳資料", state: "empty" };
+    return { total: 0, done: 0, percent: 0, label: t("progressEmpty"), state: "empty" };
   }
   // 核心邏輯優化：將 "uploading" 也視為辨識完成，避免進度條因進入上傳階段而往回跳 (regression)
   const doneStatuses = new Set(["local", "uploading", "api", "failed"]);
@@ -955,8 +1173,8 @@ function courseProgress(files) {
   const percent = Math.round((done / files.length) * 100);
   const hasWorking = files.some((file) => ["pending", "processing", "uploading"].includes(file.uploadStatus));
   const label = hasWorking
-    ? `辨識進度 ${done}/${files.length}`
-    : `辨識完成 ${done}/${files.length}`;
+    ? `${t("progressWorking")} ${done}/${files.length}`
+    : `${t("progressDone")} ${done}/${files.length}`;
   return {
     total: files.length,
     done,
@@ -968,7 +1186,7 @@ function courseProgress(files) {
 
 function renderSchedule() {
   if (!state.schedule.length) {
-    scheduleGrid.innerHTML = `<div class="empty">請先貼上或輸入課表，再按「AI 解析課表」。</div>`;
+    scheduleGrid.innerHTML = `<div class="empty">${t("noSchedule")}</div>`;
     return;
   }
 
@@ -979,12 +1197,12 @@ function renderSchedule() {
     return `
       <article class="course-slot ${active}" data-course="${course.id}">
         <strong>${course.title}</strong>
-        <small>${formatSessions(course)} / ${files.length} 份資料</small>
+        <small>${formatSessions(course)} / ${files.length} ${t("dataCount")}</small>
         <div class="badge-row">
-          <span class="badge">講義 ${files.filter((f) => f.type === "document").length}</span>
-          <span class="badge">照片 ${files.filter((f) => f.type === "image").length}</span>
-          <span class="badge">錄音 ${files.filter((f) => f.type === "audio").length}</span>
-          <span class="badge">筆記 ${files.filter((f) => f.type === "note").length}</span>
+          <span class="badge">${t("document")} ${files.filter((f) => f.type === "document").length}</span>
+          <span class="badge">${t("image")} ${files.filter((f) => f.type === "image").length}</span>
+          <span class="badge">${t("audio")} ${files.filter((f) => f.type === "audio").length}</span>
+          <span class="badge">${t("note")} ${files.filter((f) => f.type === "note").length}</span>
         </div>
         <div class="course-progress is-${progress.state}" aria-label="${progress.label}">
           <div class="course-progress-meta">
@@ -1008,7 +1226,12 @@ function renderSchedule() {
       if (course) {
         const qInput = document.querySelector("#questionInput");
         if (qInput) qInput.value = "";
-        showAnswer(`已切換至「${course.title}」。您可以於上方輸入問題並點選「整理」，我將根據本課堂上傳的講義、白板照片 OCR 文字或錄音逐字稿，為您快速梳理重點！`, false);
+        const switchedText = currentLang === "zh"
+          ? `已切換至「${course.title}」。您可以於上方輸入問題並點選「整理」，我將根據本課堂上傳的講義、白板照片 OCR 文字或錄音逐字稿，為您快速梳理重點！`
+          : currentLang === "ko"
+            ? `「${course.title}」 수업으로 전환했습니다. 질문을 입력하면 업로드된 자료, 사진 OCR, 녹음 내용을 바탕으로 정리합니다.`
+            : `Switched to "${course.title}". Ask a question and I will organize answers from uploaded handouts, photo OCR, and recordings.`;
+        showAnswer(switchedText, false);
       }
       
       render();
@@ -1018,7 +1241,7 @@ function renderSchedule() {
 
 function renderFiles() {
   if (!state.files.length) {
-    fileList.innerHTML = `<div class="empty">還沒有檔案。請上傳你的講義、照片、錄音或筆記。</div>`;
+    fileList.innerHTML = `<div class="empty">${t("noFiles")}</div>`;
     return;
   }
 
@@ -1028,9 +1251,9 @@ function renderFiles() {
       <article class="file-item type-${file.type} ${file.previewUrl ? "is-previewable" : ""}" data-file-id="${file.id}">
         ${file.type === "image" && file.previewUrl ? `<img class="file-thumb" src="${file.previewUrl}" alt="${file.name}">` : ""}
         <strong>${file.name}</strong>
-        <small>${typeLabel(file.type)} / ${formatDate(file.lastModified)}${file.previewUrl ? " / 點擊預覽" : ""}</small>
-        <div class="match">${course ? `配到：${course.title}，信心 ${file.confidence}%` : "尚未配到課程"}</div>
-        <small>${file.reasons.join("、") || "沒有明顯關鍵字或時間線索"} / ${file.vaultFileId ? `API: ${file.vaultFileId.slice(0, 8)}` : file.uploadStatus}</small>
+        <small>${typeLabel(file.type)} / ${formatDate(file.lastModified)}${file.previewUrl ? t("previewHint") : ""}</small>
+        <div class="match">${course ? `${t("matchedTo")}：${course.title}，${t("confidence")} ${file.confidence}%` : t("unmatched")}</div>
+        <small>${file.reasons.join("、") || t("noClue")} / ${file.vaultFileId ? `API: ${file.vaultFileId.slice(0, 8)}` : file.uploadStatus}</small>
       </article>
     `;
   }).join("");
@@ -1040,9 +1263,9 @@ function renderFiles() {
 function renderCourseDetail() {
   const course = courseById(state.selectedCourseId);
   if (!course) {
-    courseTitle.textContent = "尚未建立課表";
-    courseMeta.textContent = "貼上課表並解析後，選擇一門課即可查看相關講義、照片與錄音。";
-    courseFiles.innerHTML = `<div class="empty">目前沒有選取課程。</div>`;
+    courseTitle.textContent = t("noCourseTitle");
+    courseMeta.textContent = t("noCourseMeta");
+    courseFiles.innerHTML = `<div class="empty">${t("noSelectedCourse")}</div>`;
     return;
   }
 
@@ -1052,7 +1275,7 @@ function renderCourseDetail() {
   courseMeta.textContent = `${formatSessions(course)} / 關鍵字：${course.keywords.join("、")}`;
 
   if (!visible.length) {
-    courseFiles.innerHTML = `<div class="empty">這個分類目前沒有資料。</div>`;
+    courseFiles.innerHTML = `<div class="empty">${t("emptyCategory")}</div>`;
     return;
   }
 
@@ -1138,7 +1361,11 @@ function renderChatHistory(courseId) {
   
   if (history.length === 0) {
     if (copyBtn) copyBtn.style.display = "none";
-    answerBox.innerHTML = `已切換至「${course.title}」。您可以於上方輸入問題並點選「整理」，我將根據本課堂上傳的講義、白板照片 OCR 文字或錄音逐字稿，為您快速梳理重點！`;
+    answerBox.innerHTML = currentLang === "zh"
+      ? `已切換至「${course.title}」。您可以於上方輸入問題並點選「整理」，我將根據本課堂上傳的講義、白板照片 OCR 文字或錄音逐字稿，為您快速梳理重點！`
+      : currentLang === "ko"
+        ? `「${course.title}」 수업으로 전환했습니다. 질문을 입력하면 업로드된 자료, 사진 OCR, 녹음 내용을 바탕으로 정리합니다.`
+        : `Switched to "${course.title}". Ask a question and I will organize answers from uploaded handouts, photo OCR, and recordings.`;
     return;
   }
 
@@ -1178,8 +1405,8 @@ function renderChatHistory(courseId) {
 }
 
 function renderStats() {
-  fileCount.textContent = `${state.files.length} files`;
-  matchCount.textContent = `${state.files.filter((file) => file.courseId).length} matched`;
+  fileCount.textContent = `${state.files.length} ${t("files")}`;
+  matchCount.textContent = `${state.files.filter((file) => file.courseId).length} ${t("matched")}`;
 }
 
 function render() {
@@ -1295,20 +1522,20 @@ async function checkApiStatus() {
   try {
     const status = await apiFetch("/api/status");
     state.apiReady = Boolean(status.api_ready);
-    apiStatus.textContent = state.apiReady ? "API 已連線" : status.api_key_configured ? `API 異常：${status.auth_status}` : "API 未設定";
+    apiStatus.textContent = state.apiReady ? t("apiConnected") : status.api_key_configured ? `API ${status.auth_status}` : t("apiDisconnected");
     apiPanelStatus.classList.toggle("is-live", state.apiReady);
     apiPanelStatus.classList.toggle("is-error", !state.apiReady && Boolean(status.api_key_configured));
     apiPanelStatus.textContent = state.apiReady
-      ? "API 已連線，可以用 AI 解析課表並同步檔案。"
+      ? (currentLang === "zh" ? "API 已連線，可以用 AI 解析課表並同步檔案。" : currentLang === "ko" ? "API가 연결되었습니다. AI 시간표 분석과 파일 동기화를 사용할 수 있습니다." : "API connected. AI schedule parsing and file sync are ready.")
       : status.api_key_configured
-        ? `已收到 API key，但檢查未通過：${status.auth_status}`
-        : "後端尚未設定 API key。請在 .env 或部署平台環境變數設定 VAULTSAGE_API_KEY。";
+        ? `API key: ${status.auth_status}`
+        : (currentLang === "zh" ? "後端尚未設定 API key。請在 .env 或部署平台環境變數設定 VAULTSAGE_API_KEY。" : currentLang === "ko" ? "백엔드에 API key가 설정되지 않았습니다." : "Backend API key is not configured.");
   } catch {
     state.apiReady = false;
-    apiStatus.textContent = "請用 server.py 開啟";
+    apiStatus.textContent = currentLang === "zh" ? "請用 server.py 開啟" : currentLang === "ko" ? "server.py로 실행하세요" : "Run server.py";
     apiPanelStatus.classList.remove("is-live");
     apiPanelStatus.classList.add("is-error");
-    apiPanelStatus.textContent = "連不到本機 server，請確認 http://127.0.0.1:4180 有開。";
+    apiPanelStatus.textContent = currentLang === "zh" ? "連不到本機 server，請確認 http://127.0.0.1:4180 有開。" : currentLang === "ko" ? "로컬 서버에 연결할 수 없습니다." : "Cannot reach the local server.";
   }
 }
 
@@ -1416,6 +1643,9 @@ async function syncSelectedCourseToApi() {
 }
 
 document.querySelector("#pickFilesButton").addEventListener("click", () => fileInput.click());
+document.querySelectorAll(".lang-switcher button").forEach((button) => {
+  button.addEventListener("click", () => setLanguage(button.dataset.lang));
+});
 viewButtons.forEach((button) => {
   button.addEventListener("click", () => {
     switchView(button.dataset.view, true);
@@ -1569,19 +1799,21 @@ document.querySelector("#askForm").addEventListener("submit", async (event) => {
       contextStr = contextStr.slice(0, 8000) + "\n\n... (為維護 AI 回答效能，剩餘資料內容已安全截斷) ...";
     }
     
+    const responseLanguage = answerLanguageName();
     const strictGroundingRule = `回答規則：
 1. 只能根據下方提供的課堂資料內容、OCR 文字、逐字稿或已上傳檔案回答。
 2. 不可以自行補充沒有出現在資料中的內容，也不可以用一般學科知識瞎猜。
 3. 如果資料不足、OCR 沒有辨識到、或問題要求的內容不在資料內，請直接說「目前資料不足，無法根據上傳檔案判斷」。
-4. 回答時請簡短說明你依據了哪些檔案。`;
+4. 回答時請簡短說明你依據了哪些檔案。
+5. 請使用 ${responseLanguage} 回答。`;
 
     // 如果檔案還沒有同步上傳至 VaultSage，我們直接將本機提取的真實 OCR 文字與語音轉文字逐字稿做為 Context 併入 Prompt 傳給 LLM 進行問答！
     if (contextStr && !vaultFileIds.length) {
-      payload.question = `請用繁體中文回答「${course.title}」這堂課的問題。\n\n${strictGroundingRule}\n\n=== 課堂資料內容 ===\n${contextStr}\n\n=== 使用者發問 ===\n問題：${question}`;
+      payload.question = `請使用 ${responseLanguage} 回答「${course.title}」這堂課的問題。\n\n${strictGroundingRule}\n\n=== 課堂資料內容 ===\n${contextStr}\n\n=== 使用者發問 ===\n問題：${question}`;
     } else if (contextStr && vaultFileIds.length) {
-      payload.question = `請用繁體中文回答「${course.title}」這堂課的問題。\n\n${strictGroundingRule}\n\n=== 本機已辨識出的課堂資料內容 ===\n${contextStr}\n\n=== 使用者發問 ===\n問題：${question}`;
+      payload.question = `請使用 ${responseLanguage} 回答「${course.title}」這堂課的問題。\n\n${strictGroundingRule}\n\n=== 本機已辨識出的課堂資料內容 ===\n${contextStr}\n\n=== 使用者發問 ===\n問題：${question}`;
     } else {
-      payload.question = `請用繁體中文回答「${course.title}」這堂課的問題。\n\n${strictGroundingRule}\n\n目前前端沒有可用的 OCR 文字或逐字稿，只能依據已上傳到 VaultSage 的檔案檢索結果回答。若檢索不到明確內容，請回答資料不足。\n\n問題：${question}`;
+      payload.question = `請使用 ${responseLanguage} 回答「${course.title}」這堂課的問題。\n\n${strictGroundingRule}\n\n目前前端沒有可用的 OCR 文字或逐字稿，只能依據已上傳到 VaultSage 的檔案檢索結果回答。若檢索不到明確內容，請回答資料不足。\n\n問題：${question}`;
     }
     
     apiFetch("/api/chat", {
@@ -1696,9 +1928,11 @@ document.querySelector("#copyAnswerButton").addEventListener("click", () => {
 
 async function boot() {
   await restoreState();
+  applyTranslations();
   render();
   switchView(activeView, false);
   await checkApiStatus();
+  applyTranslations();
 }
 
 boot().catch((error) => {
