@@ -1910,9 +1910,7 @@ async function syncSelectedCourseToApi() {
 }
 
 // 🌟 點擊整個上傳區域（含 + 號與文字空白處）都能觸發選擇檔案
-document.querySelector("#dropZone").addEventListener("click", (e) => {
-  // 避免重複點擊按鈕觸發二次
-  if (e.target.id === "pickFilesButton") return;
+document.querySelector("#dropZone").addEventListener("click", () => {
   fileInput.click();
 });
 document.querySelectorAll(".lang-switcher button").forEach((button) => {
