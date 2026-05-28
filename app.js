@@ -55,7 +55,7 @@ const defaultScheduleText = "";
 const LANG_KEY = "mochiclass-lang";
 const translations = {
   zh: {
-    tagline: "API 優先課堂檔案管理",
+    tagline: "課表驅動的智慧課堂文件管理工具",
     reset: "重新開始",
     scheduleView: "課表",
     filesView: "上傳與佇列",
@@ -109,7 +109,7 @@ const translations = {
     recognizing: "辨識中",
   },
   en: {
-    tagline: "API-first class file manager",
+    tagline: "Schedule-driven smart class file manager",
     reset: "Reset",
     scheduleView: "Schedule",
     filesView: "Uploads",
@@ -163,7 +163,7 @@ const translations = {
     recognizing: "Reading",
   },
   ko: {
-    tagline: "API 우선 수업 파일 관리자",
+    tagline: "시간표 기반 스마트 수업 파일 관리자",
     reset: "처음부터",
     scheduleView: "시간표",
     filesView: "업로드",
