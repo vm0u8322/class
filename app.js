@@ -55,7 +55,7 @@ const defaultScheduleText = "";
 const LANG_KEY = "mochiclass-lang";
 const translations = {
   zh: {
-    tagline: "API-first class file manager",
+    tagline: "API 優先課堂檔案管理",
     reset: "重新開始",
     scheduleView: "課表",
     filesView: "上傳與佇列",

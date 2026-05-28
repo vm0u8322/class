@@ -120,44 +120,41 @@ def get_whisper():
     return _whisper_model
 
 def run_ocr_on_pil(pil_img: Image.Image) -> str:
-    # Run OCR in a subprocess so PaddleOCR API changes do not break the web server.
+    # Keep the OCR model cached in this server process; PaddleOCR v3 uses predict().
     max_size = 1000
     if max(pil_img.size) > max_size:
         pil_img = pil_img.copy()
         pil_img.thumbnail((max_size, max_size), Image.Resampling.LANCZOS)
         print(f"Resized image to {pil_img.size} for fast CPU OCR")
 
-    with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as tmp:
-        tmp_path = tmp.name
-    try:
-        pil_img.convert("RGB").save(tmp_path, format="PNG")
-        result = subprocess.run(
-            [sys.executable, str(ROOT / "ocr_helper.py"), tmp_path],
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            timeout=90,
-        )
-        for line in reversed((result.stdout or "").strip().splitlines()):
-            try:
-                payload = json.loads(line)
-                if payload.get("error"):
-                    print(f"OCR helper error: {payload['error']}")
-                return str(payload.get("text") or "").strip()
-            except json.JSONDecodeError:
-                continue
-        if result.stderr:
-            print(f"OCR helper stderr: {result.stderr[-1000:]}")
+    model = get_ocr()
+    if not model:
         return ""
-    except Exception as e:
-        print(f"OCR helper failed: {e}")
-        return ""
-    finally:
+
+    with _ocr_lock:
         try:
-            Path(tmp_path).unlink(missing_ok=True)
-        except Exception:
-            pass
+            img_np = np.array(pil_img.convert("RGB"))
+            img_cv2 = cv2.cvtColor(img_np, cv2.COLOR_RGB2BGR)
+            texts = []
+
+            if hasattr(model, "predict"):
+                result = model.predict(img_cv2)
+                for item in result or []:
+                    rec_texts = item.get("rec_texts") if hasattr(item, "get") else None
+                    if rec_texts:
+                        texts.extend(str(text) for text in rec_texts if text)
+                if texts:
+                    return " ".join(texts).replace("�P", " ").strip()
+
+            result = model.ocr(img_cv2)
+            for page in result or []:
+                for line in page or []:
+                    if line and len(line) > 1:
+                        texts.append(str(line[1][0]))
+            return " ".join(texts).strip()
+        except Exception as e:
+            print(f"OCR 執行出錯: {e}")
+            return ""
 
 def extract_pdf_ocr(body: bytes) -> str:
     ocr_texts = []
