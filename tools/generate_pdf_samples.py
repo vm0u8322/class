@@ -2,13 +2,19 @@ from pathlib import Path
 
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfbase import pdfmetrics
-from reportlab.pdfbase.cidfonts import UnicodeCIDFont
+from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.pdfgen import canvas
 
 
 ROOT = Path(__file__).resolve().parents[1]
 CLASS_DIR = ROOT / "example"
-FONT_NAME = "MSung-Light"
+FONT_NAME = "MochiClassCJK"
+FONT_CANDIDATES = [
+    Path("C:/Windows/Fonts/msjh.ttc"),
+    Path("C:/Windows/Fonts/msjh.ttf"),
+    Path("C:/Windows/Fonts/NotoSansCJK-Regular.ttc"),
+    Path("C:/Windows/Fonts/NotoSansTC-Regular.otf"),
+]
 
 
 SAMPLES = [
@@ -41,7 +47,7 @@ SAMPLES = [
         "陳冠廷",
         [
             "重點：平均數、變異數、標準差",
-            "常態分配與 Z 分數：z = (x - μ) / σ",
+            "常態分配與 Z 分數：z = (x - mu) / sigma",
             "信賴區間與抽樣誤差",
             "假設檢定流程：H0、H1、p-value 與顯著水準。",
         ],
@@ -127,10 +133,19 @@ SAMPLES = [
 ]
 
 
+def register_font() -> None:
+    for font_path in FONT_CANDIDATES:
+        if font_path.exists():
+            pdfmetrics.registerFont(TTFont(FONT_NAME, str(font_path)))
+            return
+    raise FileNotFoundError("找不到可用的中文字型，請安裝 Microsoft JhengHei 或 Noto Sans TC。")
+
+
 def draw_pdf(path: Path, title: str, teacher: str, lines: list[str]) -> None:
     pdf = canvas.Canvas(str(path), pagesize=A4)
-    width, height = A4
+    _, height = A4
     y = height - 64
+    pdf.setTitle(f"{title} 講義範例")
     pdf.setFont(FONT_NAME, 18)
     pdf.drawString(56, y, f"{title} 講義範例")
     y -= 34
@@ -152,7 +167,7 @@ def draw_pdf(path: Path, title: str, teacher: str, lines: list[str]) -> None:
 
 def main() -> None:
     CLASS_DIR.mkdir(exist_ok=True)
-    pdfmetrics.registerFont(UnicodeCIDFont(FONT_NAME))
+    register_font()
 
     for old in CLASS_DIR.glob("*"):
         if old.suffix.lower() in {".txt", ".md"} and old.name != "課表.txt":
