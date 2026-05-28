@@ -113,7 +113,12 @@ def get_whisper():
             from faster_whisper import WhisperModel
             # Use E: drive cache path to bypass C: drive disk space limitations!
             cache_dir = str(ROOT / "tools" / "whisper_models")
-            _whisper_model = WhisperModel("tiny", device="cpu", compute_type="int8", download_root=cache_dir)
+            try:
+                # 🌟 優先嘗試以離線模式加載預載模型，免除網路握手開銷
+                _whisper_model = WhisperModel("tiny", device="cpu", compute_type="int8", download_root=cache_dir, local_files_only=True)
+            except Exception:
+                # 若離線加載失敗（如本機開發環境），回退至連網下載與載入
+                _whisper_model = WhisperModel("tiny", device="cpu", compute_type="int8", download_root=cache_dir, local_files_only=False)
         except ImportError:
             print("Faster-Whisper 未安裝或雲端資源受限，將無法使用本機語音轉文字功能。")
             return None
@@ -357,7 +362,7 @@ def sync_extract_text(body: bytes, filename: str, content_type: str) -> str:
                 if whisper is None:
                     text = "【雲端伺服器提示：本機語音轉文字功能未啟動。請點選同步直接使用 VaultSage 雲端整理服務。】"
                 else:
-                    segments, info = whisper.transcribe(tmp_path, beam_size=5)
+                    segments, info = whisper.transcribe(tmp_path, beam_size=1)
                     text_list = []
                     for seg in segments:
                         text_list.append(seg.text)
