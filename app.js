@@ -525,9 +525,19 @@ function minutesOfDay(time) {
 }
 
 function normalizeDay(text) {
-  const source = String(text || "").trim();
-  const anchored = source.match(/^(?:週|星期|禮拜)?\s*([一二三四五六日天])(?:\s|[　,，、:：\-－~到至]|\d|$)/);
-  const explicit = source.match(/(?:週|星期|禮拜)\s*([一二三四五六日天])/);
+  const source = String(text || "").trim().toLowerCase();
+  
+  // 支援英文星期比對，直接對應至中文數字以相容日曆比對
+  if (source.includes("monday") || source.startsWith("mon")) return "一";
+  if (source.includes("tuesday") || source.startsWith("tue")) return "二";
+  if (source.includes("wednesday") || source.startsWith("wed")) return "三";
+  if (source.includes("thursday") || source.startsWith("thu")) return "四";
+  if (source.includes("friday") || source.startsWith("fri")) return "五";
+  if (source.includes("saturday") || source.startsWith("sat")) return "六";
+  if (source.includes("sunday") || source.startsWith("sun")) return "日";
+
+  const anchored = String(text || "").trim().match(/^(?:週|星期|禮拜)?\s*([一二三四五六日天])(?:\s|[　,，、:：\-－~到至]|\d|$)/);
+  const explicit = String(text || "").trim().match(/(?:週|星期|禮拜)\s*([一二三四五六日天])/);
   const match = anchored || explicit;
   if (!match) return "";
   return match[1] === "天" ? "日" : match[1];
@@ -553,8 +563,20 @@ function parseScheduleText(text) {
   lines.forEach((line, index) => {
     const normalizedLine = line.replace(/^\*\s*/, "").trim();
     const dayHeader = normalizedLine.match(/^(?:週|星期|禮拜)\s*([一二三四五六日天])$/);
-    if (dayHeader) {
-      currentDay = dayHeader[1] === "天" ? "日" : dayHeader[1];
+    
+    // 支援英文星期作為標題行（例如 Monday, Tuesday 等）
+    let engDay = "";
+    const lowerLine = normalizedLine.toLowerCase();
+    if (lowerLine === "monday" || lowerLine === "mon") engDay = "一";
+    else if (lowerLine === "tuesday" || lowerLine === "tue") engDay = "二";
+    else if (lowerLine === "wednesday" || lowerLine === "wed") engDay = "三";
+    else if (lowerLine === "thursday" || lowerLine === "thu") engDay = "四";
+    else if (lowerLine === "friday" || lowerLine === "fri") engDay = "五";
+    else if (lowerLine === "saturday" || lowerLine === "sat") engDay = "六";
+    else if (lowerLine === "sunday" || lowerLine === "sun") engDay = "日";
+
+    if (dayHeader || engDay) {
+      currentDay = dayHeader ? (dayHeader[1] === "天" ? "日" : dayHeader[1]) : engDay;
       return;
     }
 
