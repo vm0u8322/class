@@ -807,7 +807,7 @@ async function applyScheduleText() {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        question: `請把以下學生課表文字解析成純 JSON 陣列，不要加 Markdown，不要解釋。每個物件必須包含 id, day, start, end, title, room, keywords。day 必須忠實使用原文中的星期，不能根據日期自行推算，且只能是一、二、三、四、五、六、日。start/end 用 HH:MM。keywords 是字串陣列，至少包含課名與可能出現在檔名中的關鍵字。\n\n課表文字：\n${text}`,
+        question: `請把以下學生課表文字解析成純 JSON 陣列，不要加 Markdown，不要解釋。每個物件必須包含 id, day, start, end, title, room, keywords。day 必須轉換成中文星期數字（只能是：一、二、三、四、五、六、日）。如果原文是英文星期（如 Monday, Tuesday），請務必將其對應轉換為中文的一、二、三、四、五、六、日，不能直接輸出英文單字。start/end 用 HH:MM。keywords 是字串陣列，至少包含課名與可能出現在檔名中的關鍵字。\n\n課表文字：\n${text}`,
         file_ids: [],
       }),
     });
