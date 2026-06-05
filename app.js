@@ -112,6 +112,8 @@ const translations = {
     unmatchedOption: "-- 尚未配到課程 --",
     manualReassignReason: "手動重分配：{course}",
     manualReassignUnassigned: "手動重分配：未指定科目",
+    waitingManualAssign: "等待手動分配",
+    checkingCourseFiles: "正在檢查這堂課的圖片 OCR 與檔案內容，請稍候...",
   },
   en: {
     tagline: "Schedule-driven smart class file manager",
@@ -170,6 +172,8 @@ const translations = {
     unmatchedOption: "-- Unassigned --",
     manualReassignReason: "Manual reassign: {course}",
     manualReassignUnassigned: "Manual reassign: Unassigned",
+    waitingManualAssign: "Waiting for manual assignment",
+    checkingCourseFiles: "Checking this course's image OCR and file contents. Please wait...",
   },
   ko: {
     tagline: "시간표 기반 스마트 수업 파일 관리자",
@@ -228,6 +232,8 @@ const translations = {
     unmatchedOption: "-- 지정되지 않음 --",
     manualReassignReason: "수동 분류: {course}",
     manualReassignUnassigned: "수동 분류: 지정되지 않음",
+    waitingManualAssign: "수동 배정 대기 중",
+    checkingCourseFiles: "이 과목의 이미지 OCR과 파일 내용을 확인하는 중입니다. 잠시만 기다려 주세요...",
   },
 };
 let currentLang = localStorage.getItem(LANG_KEY) || "zh";
@@ -953,7 +959,7 @@ function classifyFile(fileLike) {
     type,
     courseId: fileLike.courseId || (best.score > 0 ? best.course.id : null),
     confidence: fileLike.confidence || (best.score > 0 ? Math.min(99, best.score * 18) : 0),
-    reasons: fileLike.reasons || (best.score > 0 ? best.reasons : ["等待手動分配"]),
+    reasons: fileLike.reasons || (best.score > 0 ? best.reasons : [t("waitingManualAssign")]),
     sourceFile,
     previewUrl,
     sourceText: fileLike.sourceText || "",
@@ -2086,7 +2092,7 @@ document.querySelector("#askForm").addEventListener("submit", async (event) => {
     state.chatHistories[course.id] = [];
   }
   state.chatHistories[course.id].push({ role: "user", content: question });
-  state.chatHistories[course.id].push({ role: "assistant", content: "正在檢查這堂課的圖片 OCR 與檔案內容，請稍候...", isLoading: true });
+  state.chatHistories[course.id].push({ role: "assistant", content: t("checkingCourseFiles"), isLoading: true });
   renderChatHistory(course.id);
   input.value = "";
 
