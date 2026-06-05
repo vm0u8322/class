@@ -1049,7 +1049,7 @@ function fileCardHtml(file) {
       <small>${typeLabel(file.type)} / ${formatDate(file.lastModified)}${previewHint}</small>
       <div class="match">${fileMatchLabel(file)}</div>
       ${selectHtml}
-      <small style="margin-top: 4px; display: block;">${fileMatchDetail(file)} / ${file.vaultFileId ? `API: ${file.vaultFileId.slice(0, 8)}` : extractionLabel(file)}</small>
+      <small style="margin-top: 4px; display: block;">${fileMatchDetail(file)} / ${extractionLabel(file)}</small>
     </article>
   `;
 }
@@ -1630,7 +1630,7 @@ function renderFiles() {
         <small>${typeLabel(file.type)} / ${formatDate(file.lastModified)}${file.previewUrl ? t("previewHint") : ""}</small>
         <div class="match">${fileMatchLabel(file)}</div>
         ${selectHtml}
-        <small style="margin-top: 4px; display: block;">${fileMatchDetail(file)} / ${file.vaultFileId ? `API: ${file.vaultFileId.slice(0, 8)}` : extractionLabel(file)}</small>
+        <small style="margin-top: 4px; display: block;">${fileMatchDetail(file)} / ${extractionLabel(file)}</small>
       </article>
     `;
   }).join("");
