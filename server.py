@@ -114,11 +114,12 @@ def get_whisper():
             # Use E: drive cache path to bypass C: drive disk space limitations!
             cache_dir = str(ROOT / "tools" / "whisper_models")
             try:
-                # 🌟 優先嘗試以離線模式加載預載模型，免除網路握手開銷
-                _whisper_model = WhisperModel("tiny", device="cpu", compute_type="int8", download_root=cache_dir, local_files_only=True)
-            except Exception:
+                # 🌟 優先嘗試直接載入本地打包的模型目錄，100% 本地極速載入，拒絕任何外網連線與警告
+                _whisper_model = WhisperModel(cache_dir, device="cpu", compute_type="int8")
+            except Exception as e:
+                print(f"本地模型載入失敗，回退至連網下載模式: {e}")
                 # 若離線加載失敗（如本機開發環境），回退至連網下載與載入
-                _whisper_model = WhisperModel("tiny", device="cpu", compute_type="int8", download_root=cache_dir, local_files_only=False)
+                _whisper_model = WhisperModel("tiny", device="cpu", compute_type="int8", download_root=cache_dir)
         except ImportError:
             print("Faster-Whisper 未安裝或雲端資源受限，將無法使用本機語音轉文字功能。")
             return None
