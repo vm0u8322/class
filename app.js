@@ -529,7 +529,11 @@ function dayIndexFromChinese(day) {
 }
 
 function minutesOfDay(time) {
-  const [hour, minute] = time.split(":").map(Number);
+  const match = String(time || "").match(/(\d{1,2}):(\d{2})/);
+  if (!match) return null;
+  const hour = Number(match[1]);
+  const minute = Number(match[2]);
+  if (!Number.isFinite(hour) || !Number.isFinite(minute)) return null;
   return hour * 60 + minute;
 }
 
@@ -885,7 +889,8 @@ function scoreFileForCourse(file, course) {
   // 1. 檔名關鍵字比對 (僅限講義和筆記比對檔名，圖片與錄音檔名是亂的不比對)
   if (!isTimePrimary) {
     for (const keyword of [course.title, ...(course.keywords || [])]) {
-      if (keyword && name.includes(keyword.toLowerCase())) {
+      const normalizedKeyword = String(keyword || "").trim().toLowerCase();
+      if (normalizedKeyword && name.includes(normalizedKeyword)) {
         score += 10;
         reasons.push(`檔名含「${keyword}」`);
         break;
@@ -895,7 +900,8 @@ function scoreFileForCourse(file, course) {
 
   // 2. 內容關鍵字比對
   for (const keyword of [course.title, ...(course.keywords || [])]) {
-    if (keyword && content.includes(keyword.toLowerCase())) {
+    const normalizedKeyword = String(keyword || "").trim().toLowerCase();
+    if (normalizedKeyword && content.includes(normalizedKeyword)) {
       const contentScore = isTimePrimary ? 2 : 15;
       score += contentScore;
       reasons.push(`內容提到「${keyword}」`);
@@ -910,12 +916,19 @@ function scoreFileForCourse(file, course) {
     const sessions = course.sessions?.length
       ? course.sessions
       : [{ day: course.day, start: course.start, end: course.end }];
-    const sameDaySession = sessions.find((session) => date.getDay() === dayIndexFromChinese(session.day));
-    const inWindowSession = sessions.find((session) => (
-      date.getDay() === dayIndexFromChinese(session.day)
-      && minute >= minutesOfDay(session.start) - 20
-      && minute <= minutesOfDay(session.end) + 20
+    const validSessions = sessions.filter((session) => (
+      dayIndexFromChinese(session.day) >= 0
+      && minutesOfDay(session.start) !== null
+      && minutesOfDay(session.end) !== null
     ));
+    const sameDaySession = validSessions.find((session) => date.getDay() === dayIndexFromChinese(session.day));
+    const inWindowSession = validSessions.find((session) => {
+      const startMinute = minutesOfDay(session.start);
+      const endMinute = minutesOfDay(session.end);
+      return date.getDay() === dayIndexFromChinese(session.day)
+        && minute >= startMinute - 20
+        && minute <= endMinute + 20;
+    });
     if (inWindowSession) {
       const timeScore = isTimePrimary ? 20 : 3;
       score += timeScore;
@@ -972,6 +985,9 @@ async function classifyTextFilesByApi(files) {
 }
 
 function classifyFile(fileLike) {
+  if (!fileLike || typeof fileLike.name !== "string" || !fileLike.name.trim()) {
+    throw new Error("Invalid file item");
+  }
   const type = inferType(fileLike.name);
   const sourceFile = fileLike.sourceFile || (fileLike instanceof File ? fileLike : null);
   // 優先沿用已存在的 previewUrl，避免重複創建 Blob URL 造成 ERR_FILE_NOT_FOUND
