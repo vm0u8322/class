@@ -1047,9 +1047,9 @@ function fileCardHtml(file) {
       ${preview}
       <strong>${file.name}</strong>
       <small>${typeLabel(file.type)} / ${formatDate(file.lastModified)}${previewHint}</small>
-      <div class="match">${file.vaultFileId ? `VaultSage: ${file.vaultFileId.slice(0, 8)}` : (file.reasons.join("、") || t("noClue"))}</div>
+      <div class="match">${fileMatchLabel(file)}</div>
       ${selectHtml}
-      <small style="margin-top: 4px; display: block;">${extractionLabel(file)}</small>
+      <small style="margin-top: 4px; display: block;">${fileMatchDetail(file)} / ${file.vaultFileId ? `API: ${file.vaultFileId.slice(0, 8)}` : extractionLabel(file)}</small>
     </article>
   `;
 }
@@ -1515,6 +1515,18 @@ function extractionLabel(file) {
   return file.uploadStatus || "";
 }
 
+function fileMatchLabel(file) {
+  const course = courseById(file.courseId);
+  if (!course) return t("unmatched");
+  return `${t("matchedTo")}：${course.title}，${t("confidence")} ${file.confidence || 0}%`;
+}
+
+function fileMatchDetail(file) {
+  const course = courseById(file.courseId);
+  if (!course) return t("unmatched");
+  return fmt(t("matchedCourseReason"), { course: course.title });
+}
+
 function courseProgress(files) {
   if (!files.length) {
     return { total: 0, done: 0, percent: 0, label: t("progressEmpty"), state: "empty" };
@@ -1616,9 +1628,9 @@ function renderFiles() {
         ${file.type === "image" && file.previewUrl ? `<img class="file-thumb" src="${file.previewUrl}" alt="${file.name}">` : ""}
         <strong>${file.name}</strong>
         <small>${typeLabel(file.type)} / ${formatDate(file.lastModified)}${file.previewUrl ? t("previewHint") : ""}</small>
-        <div class="match">${course ? `${t("matchedTo")}：${course.title}，${t("confidence")} ${file.confidence}%` : t("unmatched")}</div>
+        <div class="match">${fileMatchLabel(file)}</div>
         ${selectHtml}
-        <small style="margin-top: 4px; display: block;">${file.reasons.join("、") || t("noClue")} / ${file.vaultFileId ? `API: ${file.vaultFileId.slice(0, 8)}` : extractionLabel(file)}</small>
+        <small style="margin-top: 4px; display: block;">${fileMatchDetail(file)} / ${file.vaultFileId ? `API: ${file.vaultFileId.slice(0, 8)}` : extractionLabel(file)}</small>
       </article>
     `;
   }).join("");
