@@ -68,7 +68,7 @@ const translations = {
     checkApi: "重新檢查",
     apiPanelDefault: "正式部署模式：API key 由後端環境變數提供，前端不保存 key。",
     uploadTitle: "拖曳或點擊此處上傳講義、照片、錄音、筆記",
-    uploadDesc: "上傳後會自動讀取講義、照片與錄音內容，並依課表時間與內容線索配到對應課程；必要時可自行調整。（單一檔案限 20MB 內）",
+    uploadDesc: "拖曳上傳後會自動辨識講義、照片、錄音內容，依課表配到對應課程；必要時可再手動調整。（單一檔案限 20MB 內）",
     pickFiles: "選擇檔案",
     queueTitle: "檔案佇列",
     clear: "清空",
@@ -108,7 +108,7 @@ const translations = {
     textMissing: "未讀到文字",
     waiting: "等待中",
     recognizing: "辨識中",
-    reclassifyLabel: "調整科目：",
+    reclassifyLabel: "手動分配科：",
     unmatchedOption: "-- 尚未配到課程 --",
     manualReassignReason: "手動重分配：{course}",
     manualReassignUnassigned: "手動重分配：未指定科目",
@@ -129,7 +129,7 @@ const translations = {
     checkApi: "Check",
     apiPanelDefault: "Production mode: the API key is provided by backend environment variables.",
     uploadTitle: "Drag or click here to upload handouts, photos, recordings, notes",
-    uploadDesc: "Files are read automatically and matched to timetable courses by time and content clues; you can adjust the course when needed. (Max 20MB per file)",
+    uploadDesc: "Files are processed automatically for text/speech extraction and matched to timetable courses; you can reassign them manually when needed. (Max 20MB per file)",
     pickFiles: "Choose files",
     queueTitle: "File Queue",
     clear: "Clear",
@@ -169,7 +169,7 @@ const translations = {
     textMissing: "No text found",
     waiting: "Waiting",
     recognizing: "Reading",
-    reclassifyLabel: "Adjust course: ",
+    reclassifyLabel: "Reassign to: ",
     unmatchedOption: "-- Unassigned --",
     manualReassignReason: "Manual reassign: {course}",
     manualReassignUnassigned: "Manual reassign: Unassigned",
@@ -190,7 +190,7 @@ const translations = {
     checkApi: "다시 확인",
     apiPanelDefault: "배포 모드: API key는 백엔드 환경 변수로 관리됩니다.",
     uploadTitle: "여기로 드래그하거나 클릭하여 자료, 사진, 녹음, 노트 업로드",
-    uploadDesc: "업로드한 파일은 자동으로 읽히고 시간표의 시간 및 내용 단서를 기준으로 과목에 매칭됩니다. 필요하면 과목을 조정할 수 있습니다. (단일 파일 20MB 이하 권장)",
+    uploadDesc: "업로드한 파일은 자동으로 텍스트/음성 인식 후 시간표 과목에 매칭됩니다. 필요하면 수동으로 다시 지정할 수 있습니다. (단일 파일 20MB 이하 권장)",
     pickFiles: "파일 선택",
     queueTitle: "파일 대기열",
     clear: "비우기",
@@ -230,7 +230,7 @@ const translations = {
     textMissing: "텍스트 없음",
     waiting: "대기 중",
     recognizing: "인식 중",
-    reclassifyLabel: "과목 조정: ",
+    reclassifyLabel: "과목 수동 분류: ",
     unmatchedOption: "-- 지정되지 않음 --",
     manualReassignReason: "수동 분류: {course}",
     manualReassignUnassigned: "수동 분류: 지정되지 않음",
@@ -316,18 +316,6 @@ function setLanguage(lang) {
 
 function makeDate(date, time) {
   return new Date(`${date}T${time}:00+08:00`).getTime();
-}
-
-function inferTimestampFromName(name) {
-  const match = String(name || "").match(/(20\d{2})(\d{2})(\d{2})[_-]?(\d{2})(\d{2})(\d{2})?/);
-  if (!match) return 0;
-  const [, year, month, day, hour, minute, second = "00"] = match;
-  const timestamp = new Date(`${year}-${month}-${day}T${hour}:${minute}:${second}+08:00`).getTime();
-  return Number.isFinite(timestamp) ? timestamp : 0;
-}
-
-function effectiveFileTimestamp(file) {
-  return inferTimestampFromName(file?.name) || file?.lastModified || 0;
 }
 
 function openLocalDb() {
@@ -520,10 +508,6 @@ function formatDate(ms) {
     hour: "2-digit",
     minute: "2-digit",
   }).format(new Date(ms));
-}
-
-function formatFileDate(file) {
-  return formatDate(effectiveFileTimestamp(file));
 }
 
 function switchView(viewName, shouldScroll = false) {
@@ -926,9 +910,8 @@ function scoreFileForCourse(file, course) {
   }
 
   // 3. 時間比對
-  const fileTimestamp = effectiveFileTimestamp(file);
-  if (fileTimestamp) {
-    const date = new Date(fileTimestamp);
+  if (file.lastModified) {
+    const date = new Date(file.lastModified);
     const minute = date.getHours() * 60 + date.getMinutes();
     const sessions = course.sessions?.length
       ? course.sessions
@@ -1063,7 +1046,7 @@ function fileCardHtml(file) {
     <article class="file-item type-${file.type} ${file.previewUrl ? "is-previewable" : ""}" data-file-id="${file.id}">
       ${preview}
       <strong>${file.name}</strong>
-      <small>${typeLabel(file.type)} / ${formatFileDate(file)}${previewHint}</small>
+      <small>${typeLabel(file.type)} / ${formatDate(file.lastModified)}${previewHint}</small>
       <div class="match">${file.vaultFileId ? `VaultSage: ${file.vaultFileId.slice(0, 8)}` : (file.reasons.join("、") || t("noClue"))}</div>
       ${selectHtml}
       <small style="margin-top: 4px; display: block;">${extractionLabel(file)}</small>
@@ -1632,7 +1615,7 @@ function renderFiles() {
       <article class="file-item type-${file.type} ${file.previewUrl ? "is-previewable" : ""}" data-file-id="${file.id}">
         ${file.type === "image" && file.previewUrl ? `<img class="file-thumb" src="${file.previewUrl}" alt="${file.name}">` : ""}
         <strong>${file.name}</strong>
-        <small>${typeLabel(file.type)} / ${formatFileDate(file)}${file.previewUrl ? t("previewHint") : ""}</small>
+        <small>${typeLabel(file.type)} / ${formatDate(file.lastModified)}${file.previewUrl ? t("previewHint") : ""}</small>
         <div class="match">${course ? `${t("matchedTo")}：${course.title}，${t("confidence")} ${file.confidence}%` : t("unmatched")}</div>
         ${selectHtml}
         <small style="margin-top: 4px; display: block;">${file.reasons.join("、") || t("noClue")} / ${file.vaultFileId ? `API: ${file.vaultFileId.slice(0, 8)}` : extractionLabel(file)}</small>
@@ -2019,7 +2002,7 @@ async function syncFilesToApi(files) {
         // 🌟 核心相容性優化：由於 VaultSage 不支援音訊檔案（如 .wav、.mp3），
         // 我們會自動將背景識別出的「逐字稿內容」封裝成一個語意豐富的 .md 檔案進行上傳！
         if (file.type === "audio") {
-          const mdContent = `# 課堂錄音逐字稿大綱\n\n* **原始音訊檔名**: \`${file.name}\`\n* **錄音時間**: ${formatFileDate(file)}\n\n---\n\n### 錄音逐字稿內容：\n${file.sourceText || "（無逐字稿文字）"}`;
+          const mdContent = `# 課堂錄音逐字稿大綱\n\n* **原始音訊檔名**: \`${file.name}\`\n* **錄音時間**: ${formatDate(file.lastModified)}\n\n---\n\n### 錄音逐字稿內容：\n${file.sourceText || "（無逐字稿文字）"}`;
           const mdFilename = file.name.replace(/\.[^/.]+$/, "") + "_錄音逐字稿.md";
           fileToUpload = new File([mdContent], mdFilename, { type: "text/markdown; charset=utf-8" });
         } else if (fileToUpload) {
@@ -2039,7 +2022,7 @@ async function syncFilesToApi(files) {
         if (isFallback) {
           if (file.sourceText) {
             const fileTypeLabel = { image: "白板照片 OCR 文字", document: "講義提取文字", note: "本機筆記內容" }[file.type] || "檔案文字";
-            const mdContent = `# MochiClass 本機文字備援傳輸大綱\n\n* **原始檔名**: \`${file.name}\`\n* **檔案類型**: ${fileTypeLabel}\n* **建立時間**: ${formatFileDate(file)}\n\n---\n\n### 內容大綱：\n${file.sourceText}`;
+            const mdContent = `# MochiClass 本機文字備援傳輸大綱\n\n* **原始檔名**: \`${file.name}\`\n* **檔案類型**: ${fileTypeLabel}\n* **建立時間**: ${formatDate(file.lastModified)}\n\n---\n\n### 內容大綱：\n${file.sourceText}`;
             const mdFilename = file.name.replace(/\.[^/.]+$/, "") + "_文字備援.md";
             fileToUpload = new File([mdContent], mdFilename, { type: "text/markdown; charset=utf-8" });
             console.log(`成功將已損毀或缺損的檔案 [${file.name}] 降級為 MD 文字檔 [${mdFilename}] 上傳！`);
