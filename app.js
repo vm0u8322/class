@@ -42,7 +42,7 @@ const viewButtons = document.querySelectorAll(".view-button");
 const appViews = document.querySelectorAll(".app-view");
 
 const STORAGE_KEY = "mochiclass-state-v1";
-const SCHEDULE_CACHE_KEY = "mochiclass-schedule-cache-v1";
+const SCHEDULE_CACHE_KEY = "mochiclass-schedule-cache-v2";
 const DB_NAME = "mochiclass-local-files";
 const DB_VERSION = 1;
 const FILE_STORE = "files";
@@ -668,7 +668,13 @@ function mergeSameTitleCourses(courses) {
       });
     }
     const target = merged.get(key);
-    target.sessions.push(...sessions);
+    for (const session of sessions) {
+      const sessionKey = `${session.day}|${session.start}|${session.end}|${session.room || ""}`;
+      const exists = target.sessions.some((item) => `${item.day}|${item.start}|${item.end}|${item.room || ""}` === sessionKey);
+      if (!exists) {
+        target.sessions.push(session);
+      }
+    }
     target.keywords.push(...(course.keywords || []), course.title);
   }
 
@@ -718,23 +724,51 @@ function extractJson(text) {
 function normalizeParsedCourses(parsed, sourceText = "") {
   if (!Array.isArray(parsed)) return [];
   const localCourses = parseScheduleText(sourceText);
+  const localByTitle = new Map();
+  for (const local of localCourses) {
+    const key = courseKey(local.title);
+    if (!key) continue;
+    if (!localByTitle.has(key)) localByTitle.set(key, []);
+    localByTitle.get(key).push(local);
+  }
+
   return parsed.map((course, index) => {
-    const local = localCourses[index];
     const title = String(course.title || course.course || course.name || `課程 ${index + 1}`).trim();
-    const day = local?.day || normalizeDay(String(course.day || course.weekday || ""));
-    const start = local?.start || normalizeTime(String(course.start || course.start_time || ""));
-    const end = local?.end || normalizeTime(String(course.end || course.end_time || ""));
+    const localMatches = localByTitle.get(courseKey(title)) || [];
+    const local = localMatches[0];
+    const rawSessions = Array.isArray(course.sessions) ? course.sessions : [];
+    const apiSessions = rawSessions.map((session) => {
+      const day = normalizeDay(String(session.day || session.weekday || course.day || course.weekday || ""));
+      const start = normalizeTime(String(session.start || session.start_time || ""));
+      const end = normalizeTime(String(session.end || session.end_time || ""));
+      if (!day || !start || !end) return null;
+      return {
+        day,
+        start,
+        end,
+        room: String(session.room || session.location || course.room || course.location || "未填教室").trim(),
+      };
+    }).filter(Boolean);
+    const sessions = localMatches.length
+      ? localMatches.flatMap((item) => item.sessions?.length ? item.sessions : [{ day: item.day, start: item.start, end: item.end, room: item.room || "未填教室" }])
+      : (apiSessions.length ? apiSessions : []);
+    const fallbackDay = normalizeDay(String(course.day || course.weekday || ""));
+    const fallbackStart = normalizeTime(String(course.start || course.start_time || ""));
+    const fallbackEnd = normalizeTime(String(course.end || course.end_time || ""));
+    const firstSession = sessions[0] || (fallbackDay && fallbackStart && fallbackEnd
+      ? { day: fallbackDay, start: fallbackStart, end: fallbackEnd, room: String(course.room || course.location || "未填教室").trim() }
+      : null);
     const rawKeywords = Array.isArray(course.keywords) ? course.keywords : String(course.keywords || "").split(/[,，、\s]+/);
-    if (!title || !day || !start || !end) return null;
+    if (!title || !firstSession) return null;
     return {
       id: String(course.id || `course-${index}-${title}`).replace(/[^\w\u4e00-\u9fa5-]/g, "-"),
-      day,
-      start,
-      end,
+      day: firstSession.day,
+      start: firstSession.start,
+      end: firstSession.end,
       title,
       room: String(course.room || course.location || local?.room || "未填教室").trim(),
       keywords: [...new Set([title, ...(local?.keywords || []), ...rawKeywords.map((item) => String(item).trim()).filter(Boolean)])],
-      sessions: [{ day, start, end, room: String(course.room || course.location || local?.room || "未填教室").trim() }],
+      sessions: sessions.length ? sessions : [firstSession],
     };
   }).filter(Boolean);
 }
@@ -816,7 +850,7 @@ async function applyScheduleText() {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        question: `請把以下學生課表文字解析成純 JSON 陣列，不要加 Markdown，不要解釋。每個物件必須包含 id, day, start, end, title, room, keywords。day 必須轉換成中文星期數字（只能是：一、二、三、四、五、六、日）。如果原文是英文星期（如 Monday, Tuesday），請務必將其對應轉換為中文的一、二、三、四、五、六、日，不能直接輸出英文單字。start/end 用 HH:MM。keywords 是字串陣列，至少包含課名與可能出現在檔名中的關鍵字。\n\n課表文字：\n${text}`,
+        question: `請把以下學生課表文字解析成純 JSON 陣列，不要加 Markdown，不要解釋。每個物件必須包含 id, day, start, end, title, room, keywords。title 請保留原文課名，不要自行翻譯。day 必須轉換成中文星期數字（只能是：一、二、三、四、五、六、日）。如果原文是英文星期（如 Monday, Tuesday），請務必將其對應轉換為中文的一、二、三、四、五、六、日，不能直接輸出英文單字。start/end 用 HH:MM。keywords 是字串陣列，至少包含課名、老師、可能出現在檔名或內容中的關鍵字。如果同一門課有多個時段，可以在同一物件加入 sessions 陣列，每個 session 包含 day/start/end/room。\n\n課表文字：\n${text}`,
         file_ids: [],
       }),
     });
