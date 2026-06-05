@@ -68,7 +68,7 @@ const translations = {
     checkApi: "重新檢查",
     apiPanelDefault: "正式部署模式：API key 由後端環境變數提供，前端不保存 key。",
     uploadTitle: "拖曳或點擊此處上傳講義、照片、錄音、筆記",
-    uploadDesc: "拖曳上傳後將自動進行本機文字/語音辨識。請點擊檔案的「手動分配科」將其指派到對應課程，並於需要問答時手動點擊右側的「同步到 VaultSage」上傳即可。（單一檔案限 20MB 內）",
+    uploadDesc: "API 連線後，上傳檔案會先依課表分類，再建立課程資料夾並送進 VaultSage；本機分類只是斷線時的備援。（建議單一講義/照片/錄音限制於 20MB 內以確保最佳速度）",
     pickFiles: "選擇檔案",
     queueTitle: "檔案佇列",
     clear: "清空",
@@ -126,7 +126,7 @@ const translations = {
     checkApi: "Check",
     apiPanelDefault: "Production mode: the API key is provided by backend environment variables.",
     uploadTitle: "Drag or click here to upload handouts, photos, recordings, notes",
-    uploadDesc: "Files are processed locally for text/speech extraction. Reassign them manually to courses, then click 'Sync to VaultSage' only when you need to sync for AI Q&A. (Max 20MB per file)",
+    uploadDesc: "After API connection, files are classified by timetable, organized into course folders, and synced to VaultSage. (Max 20MB per file recommended for best speed)",
     pickFiles: "Choose files",
     queueTitle: "File Queue",
     clear: "Clear",
@@ -184,7 +184,7 @@ const translations = {
     checkApi: "다시 확인",
     apiPanelDefault: "배포 모드: API key는 백엔드 환경 변수로 관리됩니다.",
     uploadTitle: "여기로 드래그하거나 클릭하여 자료, 사진, 녹음, 노트 업로드",
-    uploadDesc: "업로드한 파일은 로컬에서 즉시 텍스트/음성 인식 처리됩니다. 수동으로 과목을 지정한 후, 필요할 때 우측의 'VaultSage 동기화'를 눌러 업로드하세요 (단일 파일 20MB 이하 권장).",
+    uploadDesc: "API 연결 후 파일은 시간표 기준으로 분류되고 VaultSage에 동기화됩니다 (최적의 성능을 위해 단일 파일 20MB 이하 권장).",
     pickFiles: "파일 선택",
     queueTitle: "파일 대기열",
     clear: "비우기",
@@ -525,19 +525,9 @@ function minutesOfDay(time) {
 }
 
 function normalizeDay(text) {
-  const source = String(text || "").trim().toLowerCase();
-  
-  // 支援英文星期比對，直接對應至中文數字以相容日曆比對
-  if (source.includes("monday") || source.startsWith("mon")) return "一";
-  if (source.includes("tuesday") || source.startsWith("tue")) return "二";
-  if (source.includes("wednesday") || source.startsWith("wed")) return "三";
-  if (source.includes("thursday") || source.startsWith("thu")) return "四";
-  if (source.includes("friday") || source.startsWith("fri")) return "五";
-  if (source.includes("saturday") || source.startsWith("sat")) return "六";
-  if (source.includes("sunday") || source.startsWith("sun")) return "日";
-
-  const anchored = String(text || "").trim().match(/^(?:週|星期|禮拜)?\s*([一二三四五六日天])(?:\s|[　,，、:：\-－~到至]|\d|$)/);
-  const explicit = String(text || "").trim().match(/(?:週|星期|禮拜)\s*([一二三四五六日天])/);
+  const source = String(text || "").trim();
+  const anchored = source.match(/^(?:週|星期|禮拜)?\s*([一二三四五六日天])(?:\s|[　,，、:：\-－~到至]|\d|$)/);
+  const explicit = source.match(/(?:週|星期|禮拜)\s*([一二三四五六日天])/);
   const match = anchored || explicit;
   if (!match) return "";
   return match[1] === "天" ? "日" : match[1];
@@ -563,20 +553,8 @@ function parseScheduleText(text) {
   lines.forEach((line, index) => {
     const normalizedLine = line.replace(/^\*\s*/, "").trim();
     const dayHeader = normalizedLine.match(/^(?:週|星期|禮拜)\s*([一二三四五六日天])$/);
-    
-    // 支援英文星期作為標題行（例如 Monday, Tuesday 等）
-    let engDay = "";
-    const lowerLine = normalizedLine.toLowerCase();
-    if (lowerLine === "monday" || lowerLine === "mon") engDay = "一";
-    else if (lowerLine === "tuesday" || lowerLine === "tue") engDay = "二";
-    else if (lowerLine === "wednesday" || lowerLine === "wed") engDay = "三";
-    else if (lowerLine === "thursday" || lowerLine === "thu") engDay = "四";
-    else if (lowerLine === "friday" || lowerLine === "fri") engDay = "五";
-    else if (lowerLine === "saturday" || lowerLine === "sat") engDay = "六";
-    else if (lowerLine === "sunday" || lowerLine === "sun") engDay = "日";
-
-    if (dayHeader || engDay) {
-      currentDay = dayHeader ? (dayHeader[1] === "天" ? "日" : dayHeader[1]) : engDay;
+    if (dayHeader) {
+      currentDay = dayHeader[1] === "天" ? "日" : dayHeader[1];
       return;
     }
 
@@ -807,7 +785,7 @@ async function applyScheduleText() {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        question: `請把以下學生課表文字解析成純 JSON 陣列，不要加 Markdown，不要解釋。每個物件必須包含 id, day, start, end, title, room, keywords。day 必須轉換成中文星期數字（只能是：一、二、三、四、五、六、日）。如果原文是英文星期（如 Monday, Tuesday），請務必將其對應轉換為中文的一、二、三、四、五、六、日，不能直接輸出英文單字。start/end 用 HH:MM。keywords 是字串陣列，至少包含課名與可能出現在檔名中的關鍵字。\n\n課表文字：\n${text}`,
+        question: `請把以下學生課表文字解析成純 JSON 陣列，不要加 Markdown，不要解釋。每個物件必須包含 id, day, start, end, title, room, keywords。day 必須忠實使用原文中的星期，不能根據日期自行推算，且只能是一、二、三、四、五、六、日。start/end 用 HH:MM。keywords 是字串陣列，至少包含課名與可能出現在檔名中的關鍵字。\n\n課表文字：\n${text}`,
         file_ids: [],
       }),
     });
@@ -933,16 +911,22 @@ function classifyFile(fileLike) {
   const sourceFile = fileLike.sourceFile || (fileLike instanceof File ? fileLike : null);
   // 優先沿用已存在的 previewUrl，避免重複創建 Blob URL 造成 ERR_FILE_NOT_FOUND
   const previewUrl = fileLike.previewUrl || (type === "image" && sourceFile ? URL.createObjectURL(sourceFile) : null);
-  
+  let best = { course: null, score: 0, reasons: [] };
+  for (const course of state.schedule) {
+    const result = scoreFileForCourse(fileLike, course);
+    if (result.score > best.score) {
+      best = { course, score: result.score, reasons: result.reasons };
+    }
+  }
   return {
-    id: fileLike.id || crypto.randomUUID(),
+    id: crypto.randomUUID(),
     name: fileLike.name,
     size: fileLike.size || 0,
     lastModified: fileLike.lastModified || 0,
     type,
-    courseId: fileLike.courseId || null,
-    confidence: fileLike.confidence || 0,
-    reasons: fileLike.reasons || ["等待手動分配"],
+    courseId: best.score > 0 ? best.course.id : null,
+    confidence: Math.min(99, best.score * 18),
+    reasons: best.reasons,
     sourceFile,
     previewUrl,
     sourceText: fileLike.sourceText || "",
@@ -1205,45 +1189,80 @@ async function enrichFileLike(fileLike) {
   return fileLike;
 }
 
-let isSchedulerRunning = false;
+async function processFileTextBatch(filesToProcess, { syncAfter = true } = {}) {
+  const targets = filesToProcess.filter((file) => file.sourceFile);
+  if (!targets.length) return;
 
-async function triggerQueueScheduler() {
-  if (isSchedulerRunning) return;
-  isSchedulerRunning = true;
+  showBackgroundStatus(fmt(tt(
+    "已加入 {total} 個檔案，正在立即進行 OCR / 文字抽取...",
+    "Added {total} file(s). OCR / text extraction is starting now...",
+    "{total}개 파일을 추가했습니다. OCR / 텍스트 추출을 바로 시작합니다..."
+  ), { total: targets.length }));
 
-  try {
-    while (true) {
-      const pendingFiles = state.files.filter((f) => f.sourceFile && f.uploadStatus === "pending");
-      if (!pendingFiles.length) break;
+  for (const file of targets) {
+    try {
+      file.uploadStatus = "processing";
+      showBackgroundStatus(fmt(tt(
+        "正在辨識 {file}...",
+        "Reading {file}...",
+        "{file} 인식 중..."
+      ), { file: file.name }));
+      render();
 
-      // 🌟 優先級判定：將 image (圖片) 與 document (講義/文檔/PDF) 設為最高優先，優先於較耗時的 audio (錄音)
-      const highPriority = pendingFiles.filter((f) => f.type === "image" || f.type === "document");
-      const fileToProcess = highPriority.length ? highPriority[0] : pendingFiles[0];
+      await enrichFileLike(file.sourceFile);
+      file.sourceText = file.sourceFile.sourceText || "";
 
+      const reClassified = classifyFile({
+        name: file.name,
+        size: file.size,
+        lastModified: file.lastModified,
+        sourceFile: file.sourceFile,
+        sourceText: file.sourceText,
+      });
+
+      file.courseId = reClassified.courseId;
+      file.confidence = reClassified.confidence;
+      file.reasons = reClassified.reasons;
+      file.uploadStatus = file.sourceText ? "local" : "failed";
+      render();
+    } catch (err) {
+      console.error(`處理檔案失敗: ${file.name}`, err);
+      file.uploadStatus = "failed";
+      render();
+    }
+  }
+
+  const extractedCount = targets.filter((file) => file.sourceText).length;
+  const missingTextCount = targets.filter((file) => !file.sourceText).length;
+  showBackgroundStatus(fmt(tt(
+    "OCR / 文字抽取完成：{total} 個檔案跑完，{extracted} 個讀到文字，{missing} 個未讀到文字。",
+    "OCR / text extraction finished: {total} file(s) processed, {extracted} with text, {missing} without text.",
+    "OCR / 텍스트 추출 완료: {total}개 처리, {extracted}개 텍스트 추출, {missing}개 텍스트 없음."
+  ), { total: targets.length, extracted: extractedCount, missing: missingTextCount }));
+
+  if (syncAfter && state.apiReady) {
+    (async () => {
       try {
-        fileToProcess.uploadStatus = "processing";
-        showBackgroundStatus(fmt(tt(
-          "正在辨識 {file}...",
-          "Reading {file}...",
-          "{file} 인식 중..."
-        ), { file: fileToProcess.name }));
-        render();
-
-        await enrichFileLike(fileToProcess.sourceFile);
-        fileToProcess.sourceText = fileToProcess.sourceFile.sourceText || "";
-        fileToProcess.uploadStatus = fileToProcess.sourceText ? "local" : "failed";
+        await classifyTextFilesByApi(targets);
         render();
       } catch (err) {
-        console.error(`處理檔案失敗: ${fileToProcess.name}`, err);
-        fileToProcess.uploadStatus = "failed";
-        render();
+        console.warn("API classification failed for batch:", err);
       }
-    }
-    
-    showBackgroundStatus(t("workIdle"));
-  } finally {
-    isSchedulerRunning = false;
+      try {
+        await syncFilesToApi(targets);
+        render();
+      } catch (err) {
+        console.warn("API sync failed for batch:", err);
+      }
+    })();
   }
+}
+
+function queueTextProcessing(filesToProcess, options) {
+  textProcessingPromise = textProcessingPromise
+    .catch(() => {})
+    .then(() => processFileTextBatch(filesToProcess, options));
+  return textProcessingPromise;
 }
 
 async function addFiles(files) {
@@ -1292,7 +1311,7 @@ async function addFiles(files) {
   state.files.push(...newFiles);
   render();
   switchView("files", true);
-  triggerQueueScheduler();
+  queueTextProcessing(newFiles, { syncAfter: true });
   return;
   
   showBackgroundStatus(`已加入 ${newFiles.length} 個檔案，正在背景排隊進行文字辨識與 AI 分析...`);
@@ -1723,7 +1742,6 @@ async function ensureCourseFileText(courseFiles, courseId) {
     && ["pending", "processing"].includes(file.uploadStatus)
   );
 
-  let lastMessageContent = "";
   while (hasPendingOrProcessing) {
     const runningFile = courseFiles.find((file) => 
       file.sourceFile 
@@ -1731,19 +1749,8 @@ async function ensureCourseFileText(courseFiles, courseId) {
       && ["pending", "processing"].includes(file.uploadStatus)
     );
     if (loadingMsg && runningFile) {
-      const newContent = `正在等候背景語音轉錄/檔案辨識佇列完成... ⏳\n(目前處理中：${runningFile.name})`;
-      if (newContent !== lastMessageContent) {
-        lastMessageContent = newContent;
-        loadingMsg.content = newContent;
-        
-        // 🌟 優先嘗試進行極速局部 DOM 更新，徹底消滅重新渲染對話歷史產生的閃爍！
-        const loadingBubble = document.querySelector("#chatThread .chat-bubble.assistant.loading");
-        if (loadingBubble) {
-          loadingBubble.innerText = newContent;
-        } else {
-          renderChatHistory(courseId);
-        }
-      }
+      loadingMsg.content = `正在等候背景語音轉錄/檔案辨識佇列完成... ⏳\n(目前處理中：${runningFile.name})`;
+      renderChatHistory(courseId);
     }
     // 每 800ms 輪詢檢查一次狀態
     await new Promise((resolve) => setTimeout(resolve, 800));
@@ -2262,10 +2269,7 @@ async function boot() {
     && ["image", "document", "audio", "note"].includes(file.type)
   ));
   if (restoredWithoutText.length) {
-    restoredWithoutText.forEach((file) => {
-      file.uploadStatus = "pending";
-    });
-    triggerQueueScheduler();
+    queueTextProcessing(restoredWithoutText, { syncAfter: true });
   }
   applyTranslations();
 }
