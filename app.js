@@ -493,7 +493,7 @@ async function restoreState() {
 }
 
 function inferType(name) {
-  const lower = name.toLowerCase();
+  const lower = String(name || "").toLowerCase();
   if (/\.(jpg|jpeg|png|webp|heic|gif)$/.test(lower)) return "image";
   if (/\.(mp3|wav|m4a|aac|flac|ogg)$/.test(lower)) return "audio";
   if (/\.(md|txt|rtf)$/.test(lower)) return "note";
@@ -875,7 +875,7 @@ async function applyScheduleText() {
 }
 
 function scoreFileForCourse(file, course) {
-  const name = file.name.toLowerCase();
+  const name = String(file.name || "").toLowerCase();
   const content = String(file.sourceText || "").toLowerCase();
   let score = 0;
   const reasons = [];
@@ -1287,6 +1287,19 @@ async function triggerQueueScheduler() {
 
         await enrichFileLike(fileToProcess.sourceFile);
         fileToProcess.sourceText = fileToProcess.sourceFile.sourceText || "";
+        const reClassified = classifyFile({
+          id: fileToProcess.id,
+          name: fileToProcess.name,
+          size: fileToProcess.size,
+          lastModified: fileToProcess.lastModified,
+          sourceFile: fileToProcess.sourceFile,
+          sourceText: fileToProcess.sourceText,
+          vaultFileId: fileToProcess.vaultFileId,
+          uploadStatus: fileToProcess.uploadStatus,
+        });
+        fileToProcess.courseId = reClassified.courseId;
+        fileToProcess.confidence = reClassified.confidence;
+        fileToProcess.reasons = reClassified.reasons;
         fileToProcess.uploadStatus = fileToProcess.sourceText ? "local" : "failed";
         render();
       } catch (err) {
@@ -1303,16 +1316,16 @@ async function triggerQueueScheduler() {
 }
 
 async function addFiles(files) {
-  const rawListArray = Array.from(files);
+  const rawListArray = Array.from(files).filter((file) => file && typeof file.name === "string" && file.name.trim());
   if (!rawListArray.length) return;
 
   // 加入大小與去重過濾，防杜 OOM 並防止佇列重複
   const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20MB 限制
-  const tooLargeFiles = rawListArray.filter(f => f.size > MAX_FILE_SIZE).map(f => f.name);
+  const tooLargeFiles = rawListArray.filter(f => Number(f.size || 0) > MAX_FILE_SIZE).map(f => f.name);
   
   const fileListArray = rawListArray.filter(f => {
-    if (f.size > MAX_FILE_SIZE) {
-      console.warn(`檔案過大已跳過: ${f.name} (${(f.size / (1024 * 1024)).toFixed(1)}MB)`);
+    if (Number(f.size || 0) > MAX_FILE_SIZE) {
+      console.warn(`檔案過大已跳過: ${f.name} (${(Number(f.size || 0) / (1024 * 1024)).toFixed(1)}MB)`);
       return false;
     }
     const isDup = state.files.some(existing => existing.name === f.name);
@@ -1341,13 +1354,39 @@ async function addFiles(files) {
   }
 
   // 1. 瞬間將所有檔案加入佇列，更新 UI 並切換分頁，給使用者即時的反饋！
-  const newFiles = fileListArray.map((f) => classifyFile(f));
+  const skippedFiles = [];
+  const newFiles = fileListArray.reduce((list, f) => {
+    try {
+      list.push(classifyFile(f));
+    } catch (error) {
+      console.warn("加入檔案時略過無法分類的檔案:", f?.name || f, error);
+      skippedFiles.push(f?.name || "unknown");
+    }
+    return list;
+  }, []);
+  if (!newFiles.length) {
+    const message = tt(
+      "這批檔案都無法加入，請確認選到的是一般檔案，不是資料夾或捷徑。",
+      "None of these files could be added. Make sure you selected regular files, not folders or shortcuts.",
+      "이 파일들은 추가할 수 없습니다. 폴더나 바로가기가 아닌 일반 파일을 선택했는지 확인하세요."
+    );
+    answerBox.textContent = message;
+    showBackgroundStatus(message);
+    return;
+  }
   newFiles.forEach((file) => {
     file.uploadStatus = "pending";
   });
   state.files.push(...newFiles);
   render();
   switchView("files", true);
+  if (skippedFiles.length) {
+    showBackgroundStatus(fmt(tt(
+      "已加入 {count} 個檔案，略過 {skipped} 個無法加入的項目。",
+      "Added {count} file(s), skipped {skipped} item(s) that could not be added.",
+      "{count}개 파일을 추가했고, 추가할 수 없는 {skipped}개 항목은 건너뛰었습니다."
+    ), { count: newFiles.length, skipped: skippedFiles.length }));
+  }
   triggerQueueScheduler();
   return;
   
@@ -2077,6 +2116,8 @@ document.addEventListener("keydown", (event) => {
 fileInput.addEventListener("change", () => {
   addFiles(fileInput.files).catch((error) => {
     answerBox.textContent = `加入檔案失敗：${error.message}`;
+  }).finally(() => {
+    fileInput.value = "";
   });
 });
 
