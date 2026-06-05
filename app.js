@@ -113,6 +113,7 @@ const translations = {
     manualReassignReason: "手動重分配：{course}",
     manualReassignUnassigned: "手動重分配：未指定科目",
     waitingManualAssign: "尚未配到課程",
+    matchedCourseReason: "已配到：{course}",
     checkingCourseFiles: "正在檢查這堂課的圖片 OCR 與檔案內容，請稍候...",
   },
   en: {
@@ -173,6 +174,7 @@ const translations = {
     manualReassignReason: "Manual reassign: {course}",
     manualReassignUnassigned: "Manual reassign: Unassigned",
     waitingManualAssign: "Not matched yet",
+    matchedCourseReason: "Matched: {course}",
     checkingCourseFiles: "Checking this course's image OCR and file contents. Please wait...",
   },
   ko: {
@@ -233,6 +235,7 @@ const translations = {
     manualReassignReason: "수동 분류: {course}",
     manualReassignUnassigned: "수동 분류: 지정되지 않음",
     waitingManualAssign: "아직 과목과 매칭되지 않음",
+    matchedCourseReason: "매칭됨: {course}",
     checkingCourseFiles: "이 과목의 이미지 OCR과 파일 내용을 확인하는 중입니다. 잠시만 기다려 주세요...",
   },
 };
@@ -950,6 +953,8 @@ function classifyFile(fileLike) {
       }
     }
   }
+  const matchedCourse = fileLike.courseId ? courseById(fileLike.courseId) : best.course;
+  const matchedReason = matchedCourse ? fmt(t("matchedCourseReason"), { course: matchedCourse.title }) : t("waitingManualAssign");
   
   return {
     id: fileLike.id || crypto.randomUUID(),
@@ -959,7 +964,7 @@ function classifyFile(fileLike) {
     type,
     courseId: fileLike.courseId || (best.score > 0 ? best.course.id : null),
     confidence: fileLike.confidence || (best.score > 0 ? Math.min(99, best.score * 18) : 0),
-    reasons: fileLike.reasons || (best.score > 0 ? best.reasons : [t("waitingManualAssign")]),
+    reasons: fileLike.reasons || (best.score > 0 && best.reasons.length ? best.reasons : [matchedReason]),
     sourceFile,
     previewUrl,
     sourceText: fileLike.sourceText || "",
