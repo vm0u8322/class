@@ -4,3 +4,7 @@ __pycache__/
 *.pyc
 .DS_Store
 node_modules/
+
+maic-app/
+maic-app-replay-before-damage/
+maic-android/
